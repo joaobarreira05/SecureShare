@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
-from .schemas import UserCreate, UserResponse, Token
+from .schemas import UserCreate, UserResponse, Token, LoginRequest
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -12,9 +11,9 @@ async def register(user: UserCreate):
     pass
 
 @router.post("/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(login_data: LoginRequest):
     """
-    OAuth2 compatible token login, get an access token for future requests.
+    Login with username and password to get an access token.
     """
     pass
 

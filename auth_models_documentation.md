@@ -69,9 +69,15 @@ These models define the JSON structure for API requests and responses.
 ### C. Login
 **Endpoint:** `POST /auth/login`
 
-**Request (`OAuth2PasswordRequestForm`)**
-*   Content-Type: `application/x-www-form-urlencoded`
-*   Body: `username=alice&password=new_secure_password`
+**Request (`LoginRequest`)**
+*   Content-Type: `application/json`
+*   Body:
+```json
+{
+  "username": "alice",
+  "password": "new_secure_password"
+}
+```
 
 **Response (`Token`)**
 ```json

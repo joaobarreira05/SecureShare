@@ -43,10 +43,10 @@ This document details the step-by-step flow of authentication data between the C
 ### Flow
 1.  **CLI (`cli/auth/commands.py`)**:
     *   **Action**: The `login` command prompts for email and password.
-    *   **Logic**: Sends a `POST` request to `/auth/login` (form-data) with `username` (email) and `password`.
+    *   **Logic**: Sends a `POST` request to `/auth/login` with JSON `{"username": "...", "password": "..."}`.
 
 2.  **Backend Router (`backend/app/auth/router.py`)**:
-    *   **Function**: `login(form_data: OAuth2PasswordRequestForm)`
+    *   **Function**: `login(login_data: LoginRequest)`
     *   **Action**: Receives the credentials.
     *   **Handoff**: Calls `auth_service.authenticate_user(email, password)`.
 
