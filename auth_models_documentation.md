@@ -99,7 +99,7 @@ These models define the JSON structure for API requests and responses.
 ## 3. JWT Token Structure
 
 The JSON Web Token (JWT) is signed by the server and contains the user's identity.
-
+[Follows standard security practices (RFC 7519)]
 **Header**
 ```json
 {
