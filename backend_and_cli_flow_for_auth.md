@@ -2,31 +2,37 @@
 
 This document details the step-by-step flow of authentication data between the Command Line Interface (CLI) and the Backend API, highlighting the specific responsibilities of each file and function.
 
-## 1. User Registration
+## 1. User Creation & Activation
 
-**Goal:** Create a new user account.
+**Goal:** Admin creates a user, and the user activates their account.
 
-### Flow
-1.  **CLI (`cli/auth/commands.py`)**:
-    *   **Action**: The `register` command prompts the user for an email and password.
-    *   **Logic**: It validates the input and sends a `POST` request to `/auth/register` with the JSON payload `{"email": "...", "password": "..."}`.
-    *   **Dependency**: Uses `requests` or `httpx` to make the call.
+### Flow A: Admin Creates User
+1.  **CLI (Admin)**:
+    *   **Command**: `user create <username>`
+    *   **Action**: Sends `POST /users` with `{"username": "..."}`.
+    *   **Auth**: Requires Administrator JWT.
 
-2.  **Backend Router (`backend/app/auth/router.py`)**:
-    *   **Function**: `register(user: UserCreate)`
-    *   **Action**: Receives the request. FastAPI automatically validates the body against the `UserCreate` schema defined in `backend/app/auth/schemas.py`.
-    *   **Handoff**: Calls `auth_service.create_user(user)`.
+2.  **Backend (`backend/app/users/router.py`)**:
+    *   **Action**: Generates a **One-Time Password (OTP)**.
+    *   **Database**: Creates a `User` record with status `inactive` and stores the hashed OTP.
+    *   **Response**: Returns the OTP in the JSON response (e.g., `{"otp": "123456"}`).
+    *   **Note**: The Admin is responsible for securely sharing this OTP with the user (e.g., in person or via secure chat).
 
-3.  **Backend Service (`backend/app/auth/service.py`)**:
-    *   **Function**: `create_user(user: UserCreate)`
+### Flow B: User Activates Account
+1.  **CLI (User)**:
+    *   **Command**: `auth activate <username> <otp>`
+    *   **Action**: Prompts for a **New Password**.
+    *   **Logic**:
+        1.  Generates a **RSA Key Pair** locally.
+        2.  Encrypts the **Private Key** with the *New Password* (using Argon2/PBKDF2).
+        3.  Sends `POST /auth/activate` with `{"username": "...", "otp": "...", "password": "...", "public_key": "...", "encrypted_private_key": "..."}`.
+
+2.  **Backend (`backend/app/auth/router.py`)**:
     *   **Action**:
-        1.  Checks if the user already exists.
-        2.  Hashes the password using `get_password_hash`.
-        3.  Creates a new `User` model instance (defined in `backend/app/auth/models.py`).
-        4.  Saves the instance to the database via `db.add()` and `db.commit()`.
-
-4.  **Backend Response**:
-    *   Returns a `201 Created` status with the created user's public info (id, email).
+        1.  Verifies the OTP matches the user's stored (hashed) OTP.
+        2.  Updates the user's record: sets `hashed_password`, stores `public_key` and `encrypted_private_key`.
+        3.  Sets status to `active`.
+    *   **Response**: `200 OK`.
 
 ---
 
@@ -37,7 +43,7 @@ This document details the step-by-step flow of authentication data between the C
 ### Flow
 1.  **CLI (`cli/auth/commands.py`)**:
     *   **Action**: The `login` command prompts for email and password.
-    *   **Logic**: Sends a `POST` request to `/auth/token` (form-data) with `username` (email) and `password`.
+    *   **Logic**: Sends a `POST` request to `/auth/login` (form-data) with `username` (email) and `password`.
 
 2.  **Backend Router (`backend/app/auth/router.py`)**:
     *   **Function**: `login(form_data: OAuth2PasswordRequestForm)`

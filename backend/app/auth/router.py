@@ -11,7 +11,7 @@ async def register(user: UserCreate):
     """
     pass
 
-@router.post("/token", response_model=Token)
+@router.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """
     OAuth2 compatible token login, get an access token for future requests.
