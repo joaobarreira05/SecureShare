@@ -33,15 +33,14 @@ These models define the JSON structure for API requests and responses.
 ```json
 {
   "username": "alice",
-  "full_name": "Alice Wonderland",
-  "email": "alice@example.com"
+  "otp": "123456",
 }
 ```
 
 **Response**
 ```json
 {
-  "otp": "123456"  // Only returned once!
+  "Created new user Successfully"
 }
 ```
 
