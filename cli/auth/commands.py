@@ -7,12 +7,12 @@ import json
 
 
 from cli.core.session import save_token, load_token, clear_token
-from cli.core.api import api_login, api_get_me
+from cli.core.api import api_login, api_logout
 from cli.core.crypto import generate_rsa_keypair, encrypt_private_key_with_password
 from cli.core.config import VAULT_FILE, PUBLIC_KEY_FILE
 
 
-app = typer.Typer(help="Comandos de autenticação (login, me, logout)")
+app = typer.Typer(help="Comandos de autenticação (login, logout)")
 
 USERNAME_REGEX = re.compile(r"^[a-zA-Z0-9_.-]{3,64}$")
 
@@ -53,37 +53,20 @@ def login(
     typer.echo("Login efetuado com sucesso (token guardado).")
 
 
-@app.command("me")
-def me():
-    """
-    Mostra info do utilizador autenticado:
-    - Fase 1: usa api_get_me() fake.
-    - Fase 2: api_get_me() chama /auth/me de verdade.
-    """
-    token = load_token()
-    if not token:
-        typer.echo("Não tens sessão ativa. Faz primeiro `secureshare auth login`.")
-        raise typer.Exit(code=1)
-
-    user_info = api_get_me(token)
-    if user_info is None:
-        typer.echo("Token inválido ou sessão expirada. Faz login outra vez.")
-        raise typer.Exit(code=1)
-
-    typer.echo("Utilizador autenticado:")
-    typer.echo(f"  ID:        {user_info.get('id')}")
-    typer.echo(f"  Username:  {user_info.get('username')}")
-    typer.echo(f"  Email:     {user_info.get('email')}")
-    typer.echo(f"  Ativo:     {user_info.get('is_active')}")
-
-
 @app.command("logout")
 def logout():
     """
-    Termina a sessão local (apaga token guardado).
+    Termina a sessão local e no backend.
     """
+    token = load_token()
+    if token:
+        if api_logout(token):
+            typer.echo("Logout efetuado no backend.")
+        else:
+            typer.echo("Aviso: Falha ao fazer logout no backend (token inválido ou erro de rede).")
+    
     clear_token()
-    typer.echo("Sessão terminada (token removido).")
+    typer.echo("Sessão local terminada.")
 
 @app.command("activate")
 def activate():
@@ -124,6 +107,21 @@ def activate():
     # Criar vault (private key encriptada com password)
     vault_obj = encrypt_private_key_with_password(private_pem, password)
 
+    # Preparar dados para o backend
+    from cli.core.api import api_activate
+    activation_data = {
+        "username": username,
+        "otp": otp,
+        "password": password,
+        "public_key": public_pem.decode("utf-8"),
+        "encrypted_private_key": json.dumps(vault_obj)
+    }
+
+    # Chamar API
+    if not api_activate(activation_data):
+        typer.echo("Falha na ativação. Verifica o OTP e o username.")
+        raise typer.Exit(code=1)
+
     # Guardar vault.json
     with open(VAULT_FILE, "w", encoding="utf-8") as f:
         json.dump(vault_obj, f, indent=2)
@@ -134,6 +132,6 @@ def activate():
 
     typer.echo(f"Vault criado em: {VAULT_FILE}")
     typer.echo(f"Chave pública guardada em: {PUBLIC_KEY_FILE}")
-    typer.echo("Ativação concluída.")
+    typer.echo("Ativação concluída com sucesso.")
 
 
