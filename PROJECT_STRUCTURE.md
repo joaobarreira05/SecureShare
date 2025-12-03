@@ -9,17 +9,19 @@ This document outlines the file structure of the SecureShare project and the res
 │       ├── api/                            # General API endpoints (if not modularized)
 │       ├── auth/                           # Authentication module
 │       │   ├── __init__.py                 # Makes the directory a package
-│       │   ├── models.py                   # Database models for Users (SQLAlchemy)
 │       │   ├── router.py                   # API route definitions (Register, Login, Me)
-│       │   ├── schemas.py                  # Pydantic models for request/response validation
 │       │   └── service.py                  # Business logic (Password hashing, JWT generation)
+│       ├── models/                         # Database Models & DTOs (SQLModel)
+│       │   ├── __init__.py                 # Makes the directory a package
+│       │   ├── User.py                     # User model and related DTOs
+│       │   └── JWTAuthToken.py             # JWT Token models
 │       ├── users/                          # User Management module
 │       │   ├── __init__.py                 # Makes the directory a package
 │       │   ├── router.py                   # API route definitions (Vault retrieval)
-│       │   ├── schemas.py                  # Pydantic models for Vault data
 │       │   └── service.py                  # Business logic (Vault retrieval/update)
 │       ├── core/                           # Core application configuration
-│       │   ├── config.py                   # Environment variables and settings (e.g., Secret Keys)
+│       │   ├── config.py                   # (Deprecated) Old config file
+│       │   ├── settings.py                 # Application settings (Database URL, Secrets)
 │       │   └── database.py                 # Database connection and session management
 │       ├── __init__.py                     # Makes the directory a package
 │       └── main.py                         # Application entry point, initializes FastAPI app
@@ -40,15 +42,17 @@ This document outlines the file structure of the SecureShare project and the res
 
 ### Backend (`backend/app`)
 - **`auth/`**: Handles everything related to user identity.
-    - **`router.py`**: The interface layer. Receives HTTP requests, validates input using `schemas.py`, calls `service.py`, and returns responses.
-    - **`service.py`**: The logic layer. Handles password hashing, token creation, and database interactions via `models.py`.
-    - **`schemas.py`**: The data transfer objects (DTOs). Ensures data sent to and from the API is valid.
-    - **`models.py`**: The database schema. Defines how user data is stored in the database.
+    - **`router.py`**: The interface layer. Receives HTTP requests, calls `service.py`, and returns responses.
+    - **`service.py`**: The logic layer. Handles password hashing, token creation, and database interactions.
+- **`models/`**: Contains all SQLModel classes (Database Entities) and Pydantic models (DTOs).
+    - **`User.py`**: Defines the `User` table and DTOs like `UserCreate`, `LoginRequest`.
+    - **`JWTAuthToken.py`**: Defines the `Token` response structure.
 - **`users/`**: Handles user-specific operations.
     - **`router.py`**: Endpoints for user management, including vault retrieval (`GET /users/me/vault`).
-    - **`schemas.py`**: Data structures for user operations (e.g., VaultContent).
     - **`service.py`**: Business logic for user operations (e.g., fetching vault from DB).
-- **`core/`**: Contains infrastructure code that is used across the application, such as database connections and global settings.
+- **`core/`**: Contains infrastructure code.
+    - **`settings.py`**: Application configuration (Database URL, Secrets).
+    - **`database.py`**: Database connection and session management.
 - **`main.py`**: The glue that brings everything together. It configures the API, includes routers, and starts the server.
 
 ### CLI (`cli/`)
