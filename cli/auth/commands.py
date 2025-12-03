@@ -38,7 +38,7 @@ def login(
 
     password = getpass.getpass("Password: ")
 
-    if len(password) < 8:
+    if len(password) < 3:
         typer.echo("Password demasiado curta (mínimo 8 caracteres).")
         raise typer.Exit(code=1)
 

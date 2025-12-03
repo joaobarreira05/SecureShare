@@ -40,3 +40,17 @@ def api_activate(activation_data: dict) -> bool:
         return resp.status_code == 200
     except Exception:
         return False
+
+def api_create_user(token: str, user_data: dict) -> bool:
+    """
+    Cria um novo utilizador no backend (Admin only).
+    """
+    url = f"{BASE_URL}/users"
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    try:
+        resp = requests.post(url, json=user_data, headers=headers, timeout=10)
+        return resp.status_code == 201
+    except Exception:
+        return False
+
