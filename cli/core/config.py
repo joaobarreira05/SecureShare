@@ -12,3 +12,6 @@ SESSION_FILE = APP_DIR / "session.json"
 
 # Garantir que a pasta existe
 APP_DIR.mkdir(parents=True, exist_ok=True)
+
+VAULT_FILE = APP_DIR / "vault.json"
+PUBLIC_KEY_FILE = APP_DIR / "public_key.pem"
