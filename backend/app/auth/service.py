@@ -11,48 +11,12 @@ from ..models.User import User, UserActivate
 from ..models.JWTAuthToken import TokenPayload
 
 # Password hashing
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 # OAuth2 scheme (for extracting token from header)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-import hashlib
-import binascii
-
-# ... existing imports ...
-
-def get_custom_hash(password: str, salt: str, alg: str = "sha256", iters: int = 10000) -> str:
-    """
-    Generates a custom hash in the format: $$hash$alg$salt$iters
-    """
-    dk = hashlib.pbkdf2_hmac(alg, password.encode(), salt.encode(), iters)
-    hex_hash = binascii.hexlify(dk).decode()
-    return f"$${hex_hash}${alg}${salt}${iters}"
-
-def verify_custom_hash(plain_password: str, stored_hash: str) -> bool:
-    """
-    Verifies a password against the custom hash format: $$hash$alg$salt$iters
-    """
-    try:
-        # Remove leading $$ and split
-        parts = stored_hash[2:].split('$')
-        if len(parts) != 4:
-            return False
-        
-        hex_hash, alg, salt, iters = parts
-        iters = int(iters)
-        
-        # Recalculate hash
-        dk = hashlib.pbkdf2_hmac(alg, plain_password.encode(), salt.encode(), iters)
-        recalculated_hash = binascii.hexlify(dk).decode()
-        
-        return recalculated_hash == hex_hash
-    except Exception:
-        return False
-
 def verify_password(plain_password, hashed_password):
-    if hashed_password.startswith("$$"):
-        return verify_custom_hash(plain_password, hashed_password)
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
@@ -141,10 +105,6 @@ async def activate_user_account(session: Session, activation_data: UserActivate)
     if user.is_active:
         raise HTTPException(status_code=400, detail="User already active")
 
-    # Verify OTP (In a real app, verify hash. Here assuming simple check or hash comparison)
-    # For this implementation, let's assume otp_hash stores the actual OTP or a hash of it.
-    # If it's a hash: verify_password(activation_data.otp, user.otp_hash)
-    # Let's assume otp_hash IS the hash of the OTP.
     if not verify_password(activation_data.otp, user.otp_hash):
          raise HTTPException(status_code=400, detail="Invalid OTP")
 

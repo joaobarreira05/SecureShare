@@ -9,7 +9,6 @@ class TokenPayload(SQLModel):
     sub: str | None = None # User ID
     exp: int | None = None # Expiration time
     iat: int | None = None # Issued at time
-    scopes: list[str] = [] # Scopes
 
 class JWTAuthToken(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)

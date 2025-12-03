@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     PROJECT_NAME: str = "SecureShare"
     DATABASE_URL: str = "sqlite:///./secureshare.db"
-    SECRET_KEY: str = "change_this_to_a_secure_random_key"
+    SECRET_KEY: str = "change_this_to_a_secure_random_key" #used to sign the JWT tokens
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     
