@@ -8,9 +8,13 @@ from jose import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "https://127.0.0.1:8000"
 ADMIN_USER = "admin"
 ADMIN_PASS = "admin"
+CA_CERT = os.path.abspath("certs/ca.crt")
+os.environ["REQUESTS_CA_BUNDLE"] = CA_CERT
+print(f"DEBUG: CA_CERT path: {CA_CERT}")
+print(f"DEBUG: CA_CERT exists: {os.path.exists(CA_CERT)}")
 
 def print_header(msg):
     print(f"\n{'='*60}\n{msg}\n{'='*60}")
@@ -161,7 +165,7 @@ def test_flow():
 
     # Login as Standard User
     print_step("Logging in as Standard User")
-    resp = requests.post(f"{BASE_URL}/auth/login", json={"username": std_username, "password": "password123"})
+    resp = requests.post(f"{BASE_URL}/auth/login", json={"username": std_username, "password": "password123"}, verify=CA_CERT)
     if resp.status_code == 200:
         user_token = resp.json()["access_token"]
         user_headers = {"Authorization": f"Bearer {user_token}"}
@@ -179,7 +183,7 @@ def test_flow():
         'recipient_keys': json.dumps([]),
         'expires_in_days': 7
     }
-    resp = requests.post(f"{BASE_URL}/transfers", headers=user_headers, files=files, data=data)
+    resp = requests.post(f"{BASE_URL}/transfers", headers=user_headers, files=files, data=data, verify=CA_CERT)
     if resp.status_code == 403:
         print_success(f"Upload failed/rejected as expected: {resp.status_code}")
     else:
@@ -215,7 +219,7 @@ def test_flow():
     # Reset file cursor or create new tuple
     files = {'file': ('secret_doc.txt', b'This is a TOP SECRET document.')}
     
-    resp = requests.post(f"{BASE_URL}/transfers", headers=user_headers, files=files, data=data)
+    resp = requests.post(f"{BASE_URL}/transfers", headers=user_headers, files=files, data=data, verify=CA_CERT)
     if resp.status_code == 201:
         transfer_id = resp.json()["transfer_id"]
         print_success(f"Upload succeeded! Transfer ID: {transfer_id}")
@@ -225,7 +229,7 @@ def test_flow():
 
     # [SUCCESS] Download File
     print_step("Attempting download of the uploaded file")
-    resp = requests.get(f"{BASE_URL}/transfers/download/{transfer_id}", headers=user_headers)
+    resp = requests.get(f"{BASE_URL}/transfers/download/{transfer_id}", headers=user_headers, verify=CA_CERT)
     if resp.status_code == 200:
         content = resp.content
         if content == b'This is a TOP SECRET document.':
@@ -237,7 +241,7 @@ def test_flow():
 
     # [SUCCESS] List Transfers
     print_step("Listing user transfers")
-    resp = requests.get(f"{BASE_URL}/transfers", headers=user_headers)
+    resp = requests.get(f"{BASE_URL}/transfers", headers=user_headers, verify=CA_CERT)
     if resp.status_code == 200:
         transfers = resp.json()
         if len(transfers) > 0:
@@ -249,7 +253,7 @@ def test_flow():
 
     # [SUCCESS] Delete Transfer
     print_step("Deleting transfer")
-    resp = requests.delete(f"{BASE_URL}/transfers/{transfer_id}", headers=user_headers)
+    resp = requests.delete(f"{BASE_URL}/transfers/{transfer_id}", headers=user_headers, verify=CA_CERT)
     if resp.status_code == 200:
         print_success("Delete succeeded")
     else:
