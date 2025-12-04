@@ -2,7 +2,7 @@ from sqlmodel import Session, select
 from .database import engine
 from .settings import settings
 from ..models.User import User
-from ..auth.service import get_custom_hash
+from ..auth.service import get_password_hash
 
 def init_db():
     with Session(engine) as session:
@@ -13,11 +13,16 @@ def init_db():
             print(f"Creating initial admin user: {settings.ADMIN_USERNAME}")
             
             # Generate custom hash
-            hashed_password = get_custom_hash(
-                settings.ADMIN_PASSWORD,
-                settings.HASH_SALT,
-                settings.HASH_ALGORITHM,
-                settings.HASH_ITERATIONS
+            hashed_password = get_password_hash(settings.ADMIN_PASSWORD)
+            
+            # Generate Admin Keys
+            print("Generating Admin RSA Keys (4096 bits)...")
+            from .crypto import generate_rsa_keypair, encrypt_private_key_with_password
+            
+            private_pem, public_pem = generate_rsa_keypair()
+            encrypted_private_key = encrypt_private_key_with_password(
+                private_pem, 
+                settings.ADMIN_PASSWORD
             )
             
             admin_user = User(
@@ -28,8 +33,8 @@ def init_db():
                 email="admin@secureshare.local",
                 is_active=True,
                 is_admin=True,
-                public_key=settings.ADMIN_PUBLIC_KEY,
-                encrypted_private_key=settings.ADMIN_ENCRYPTED_PRIVATE_KEY
+                public_key=public_pem.decode("utf-8"),
+                encrypted_private_key=encrypted_private_key
             )
             
             session.add(admin_user)
