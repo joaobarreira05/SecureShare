@@ -1,17 +1,19 @@
 import typer
 import re
-from typing import Optional
+from typing import Optional, List
 import json
 import base64
 from cli.core.session import load_token, save_mls_token, load_rbac_token, save_rbac_token
-from cli.core.api import api_create_user, api_get_user_clearances, api_get_user_by_username, api_assign_role, api_get_my_info
+from cli.core.api import api_create_user, api_get_user_clearances, api_get_user_by_username, api_assign_role, api_get_my_info, api_assign_clearance
 from cli.core.rbac import create_rbac_payload, sign_rbac_token, decode_rbac_token, VALID_ROLES
+from cli.core.mls import create_mls_payload, sign_mls_token, VALID_LEVELS
 from cli.core.crypto import load_private_key_from_vault
 
 app = typer.Typer(help="Comandos de gestão de utilizadores (create, list, etc.)")
 
 USERNAME_REGEX = re.compile(r"^[a-zA-Z0-9_.-]{3,64}$")
 EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
+
 
 @app.command("create")
 def create_user():
@@ -252,3 +254,82 @@ def assign_role(
     else:
         typer.echo("Falha ao atribuir role. Verifica se tens permissões (Admin ou Security Officer).")
         raise typer.Exit(code=1)
+
+
+@app.command("assign-clearance")
+def assign_clearance(
+    target_username: str = typer.Argument(..., help="Username do utilizador alvo"),
+    level: str = typer.Option(..., "--level", "-l", help=f"Nível de segurança: {', '.join(VALID_LEVELS)}"),
+    departments: List[str] = typer.Option([], "--dept", "-d", help="Departamentos (pode repetir)"),
+    expire_days: int = typer.Option(365, "--expire-days", help="Dias até expiração"),
+):
+    """
+    Atribui uma clearance (MLS Token) a um utilizador.
+    Requer: Security Officer com role ativo.
+    """
+    token = load_token()
+    if not token:
+        typer.echo("Não tens sessão ativa. Faz primeiro login.")
+        raise typer.Exit(code=1)
+
+    # Validar nível
+    if level not in VALID_LEVELS:
+        typer.echo(f"Nível inválido. Deve ser um de: {', '.join(VALID_LEVELS)}")
+        raise typer.Exit(code=1)
+
+    # Obter RBAC token (deve ser SO)
+    my_rbac_token = load_rbac_token()
+    if not my_rbac_token:
+        typer.echo("Precisas de ter um role ativo. Usa 'users role' para selecionar.")
+        raise typer.Exit(code=1)
+
+    # Verificar se é Security Officer
+    rbac_payload = decode_rbac_token(my_rbac_token)
+    if not rbac_payload or rbac_payload.get("app_role") != "SECURITY_OFFICER":
+        typer.echo("Apenas Security Officers podem atribuir clearances.")
+        raise typer.Exit(code=1)
+
+    # Obter minha info (issuer)
+    my_info = api_get_my_info(token)
+    if not my_info:
+        typer.echo("Falha ao obter informação do utilizador atual.")
+        raise typer.Exit(code=1)
+    issuer_id = my_info.get("id")
+
+    # Obter info do target
+    target_user = api_get_user_by_username(token, target_username)
+    if not target_user:
+        typer.echo(f"Utilizador '{target_username}' não encontrado.")
+        raise typer.Exit(code=1)
+    subject_id = target_user.get("id")
+
+    # Carregar private key
+    typer.echo("A carregar chave privada...")
+    try:
+        private_key = load_private_key_from_vault()
+        private_key_pem = private_key.private_bytes(
+            encoding=__import__('cryptography.hazmat.primitives.serialization', fromlist=['Encoding']).Encoding.PEM,
+            format=__import__('cryptography.hazmat.primitives.serialization', fromlist=['PrivateFormat']).PrivateFormat.PKCS8,
+            encryption_algorithm=__import__('cryptography.hazmat.primitives.serialization', fromlist=['NoEncryption']).NoEncryption()
+        )
+    except Exception as e:
+        typer.echo(f"Falha ao carregar private key: {e}")
+        raise typer.Exit(code=1)
+
+    # Criar e assinar MLS token
+    try:
+        payload = create_mls_payload(issuer_id, subject_id, level, departments, expire_days)
+        signed_jwt = sign_mls_token(payload, private_key_pem)
+    except Exception as e:
+        typer.echo(f"Falha ao criar token: {e}")
+        raise typer.Exit(code=1)
+
+    # Enviar para backend
+    if api_assign_clearance(token, subject_id, signed_jwt, my_rbac_token):
+        dept_str = ", ".join(departments) if departments else "(nenhum)"
+        typer.echo(f"Clearance '{level}' atribuída a '{target_username}' com sucesso! ✅")
+        typer.echo(f"Departamentos: {dept_str}")
+    else:
+        typer.echo("Falha ao atribuir clearance. Verifica se tens permissões de Security Officer.")
+        raise typer.Exit(code=1)
+

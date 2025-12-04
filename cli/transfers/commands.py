@@ -25,7 +25,7 @@ from cli.core.crypto import (
     decrypt_file_with_aes_gcm,
     load_private_key_from_vault
 )
-from cli.core.config import VAULT_FILE, BASE_URL
+from cli.core.config import BASE_URL
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 

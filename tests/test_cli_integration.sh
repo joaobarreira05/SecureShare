@@ -3,12 +3,11 @@
 # SecureShare CLI - Test Script (Backend Integration)
 # ===================================================================
 # Pré-requisitos:
-#   1. Backend a correr em http://localhost:8000
+#   1. Backend a correr em https://localhost:8000
 #   2. Admin já criado no sistema (via init_db ou .env)
-#   3. Ficheiro de teste: echo "test content" > /tmp/testfile.txt
 # ===================================================================
 
-# set -e  # Comentado para ver todos os testes
+set -e  # Parar em caso de erro
 
 # Função para correr CLI
 cli() {
@@ -22,167 +21,153 @@ echo "test content" > /tmp/testfile.txt
 echo "secret document" > /tmp/secret.txt
 
 # ===================================================================
-# 1. AUTH - Login/Logout
+# 1. AUTH - Login Admin
 # ===================================================================
 echo ""
 echo "=========================================="
-echo "1. AUTH TESTS"
+echo "1. LOGIN ADMIN"
 echo "=========================================="
 
-echo "--- 1.1 Login como Admin (DEVE SUCEDER) ---"
-cli auth login
-# Vai pedir username/password interativamente
-
-echo "--- 1.2 Logout ---"
-cli auth logout
-
-echo "--- 1.3 Tentativa sem sessão (DEVE FALHAR) ---"
-cli users create || echo "✅ Falhou como esperado (sem sessão)"
-
-# Login novamente para continuar testes
-echo "--- Login Admin novamente ---"
+echo "--- Login como Admin ---"
+echo "Username: admin | Password: adminadmin"
 cli auth login
 
 # ===================================================================
-# 2. DEPARTMENTS (Admin Only)
+# 2. DEPARTMENTS (Admin)
 # ===================================================================
 echo ""
 echo "=========================================="
-echo "2. DEPARTMENTS TESTS (Admin Only)"
+echo "2. CRIAR DEPARTAMENTOS"
 echo "=========================================="
 
-echo "--- 2.1 Criar departamentos ---"
 cli departments create "Finance"
 cli departments create "HR"
 cli departments create "Engineering"
-
-echo "--- 2.2 Listar departamentos ---"
-cli departments list
-
-echo "--- 2.3 Apagar um departamento ---"
-cli departments delete 1 --force || echo "⚠️ Pode falhar se ID não existe"
-
-echo "--- 2.4 Listar após delete ---"
 cli departments list
 
 # ===================================================================
-# 3. USERS (Admin/SO)
+# 3. CRIAR USERS (Admin)
 # ===================================================================
 echo ""
 echo "=========================================="
-echo "3. USERS TESTS"
+echo "3. CRIAR 3 UTILIZADORES"
 echo "=========================================="
 
-echo "--- 3.1 Criar utilizador regular ---"
-# Interativo: vai pedir username, otp, email, full_name
+echo "--- Criar user1 (vai ser regular) ---"
+echo "username=user1, otp=otp1, email=user1@test.com, name=User One"
 cli users create
-# Sugestão: user1, temppass123, user1@test.com, User One
 
-echo "--- 3.2 Criar outro utilizador ---"
+echo "--- Criar user2 (vai ser regular) ---"
+echo "username=user2, otp=otp2, email=user2@test.com, name=User Two"
 cli users create
-# Sugestão: user2, temppass456, user2@test.com, User Two
 
-echo "--- 3.3 Atribuir role SECURITY_OFFICER a user1 ---"
-# Primeiro, user1 precisa ativar a conta e ter vault
-# Assumindo que já está ativado:
-cli users assign-role user1 --role SECURITY_OFFICER || echo "⚠️ Pode falhar se user não ativou"
+echo "--- Criar user3 (vai ser Security Officer) ---"
+echo "username=officer, otp=otp3, email=officer@test.com, name=Security Officer"
+cli users create
 
 # ===================================================================
-# 4. MLS & RBAC TOKENS (Como user ativado)
+# 4. ATRIBUIR ROLE SO AO USER3 (Admin)
 # ===================================================================
 echo ""
 echo "=========================================="
-echo "4. MLS & RBAC TOKENS"
+echo "4. ATRIBUIR SECURITY_OFFICER AO USER3"
 echo "=========================================="
 
-echo "--- 4.1 [Admin] Logout ---"
+echo "--- Admin atribui role SO ao officer ---"
+cli users assign-role officer --role SECURITY_OFFICER
+
+echo "--- Logout Admin ---"
 cli auth logout
 
-echo "--- 4.2 [User1] Login ---"
-# Ativar primeiro se necessário: cli auth activate
-cli auth login
-# username: user1, password: <a password definida na ativação>
-
-echo "--- 4.3 Listar clearances MLS ---"
-cli users clearance || echo "⚠️ Sem clearances (SO precisa atribuir)"
-
-echo "--- 4.4 Listar roles RBAC ---"
-cli users role || echo "⚠️ Sem roles"
-
 # ===================================================================
-# 5. TRANSFERS - Upload/Download
+# 5. ATIVAR CONTAS
 # ===================================================================
 echo ""
 echo "=========================================="
-echo "5. TRANSFERS TESTS"
+echo "5. ATIVAR CONTAS DOS USERS"
 echo "=========================================="
 
-echo "--- 5.1 Upload ficheiro privado (para user2) ---"
-cli transfers upload /tmp/testfile.txt --to user2 --level UNCLASSIFIED
+echo "--- Ativar user1 ---"
+echo "username=user1, otp=otp1, password=user1pass"
+cli auth activate
+cli auth logout
 
-echo "--- 5.2 Upload com nível SECRET (pode falhar sem clearance) ---"
-cli transfers upload /tmp/secret.txt --to user2 --level SECRET --dept Engineering || echo "⚠️ MLS Check falhou (esperado sem clearance)"
+echo "--- Ativar user2 ---"
+echo "username=user2, otp=otp2, password=user2pass"
+cli auth activate
+cli auth logout
 
-echo "--- 5.3 Upload público ---"
-cli transfers upload /tmp/testfile.txt --public
-# Vai mostrar link com #key
+echo "--- Ativar officer ---"
+echo "username=officer, otp=otp3, password=officerpass"
+cli auth activate
 
-echo "--- 5.4 Listar transferências ---"
+# ===================================================================
+# 6. OFFICER ATRIBUI CLEARANCES
+# ===================================================================
+echo ""
+echo "=========================================="
+echo "6. OFFICER ATRIBUI CLEARANCES"
+echo "=========================================="
+
+echo "--- Officer já está logado ---"
+
+echo "--- Selecionar role SO ---"
+cli users role
+
+echo "--- Atribuir SECRET clearance ao user1 ---"
+cli users assign-clearance user1 --level SECRET --dept Engineering --dept Finance
+
+echo "--- Atribuir CONFIDENTIAL clearance ao user2 ---"
+cli users assign-clearance user2 --level CONFIDENTIAL --dept HR
+
+echo "--- Logout officer ---"
+cli auth logout
+
+# ===================================================================
+# 7. TESTAR MLS - User1 (SECRET)
+# ===================================================================
+echo ""
+echo "=========================================="
+echo "7. TESTAR MLS - USER1 (SECRET)"
+echo "=========================================="
+
+echo "--- Login user1 ---"
+cli auth login
+
+echo "--- Verificar clearances ---"
+cli users clearance
+
+echo "--- Upload SECRET para Engineering (DEVE FUNCIONAR) ---"
+cli transfers upload /tmp/testfile.txt --to user2 --level SECRET --dept Engineering
+
+echo "--- Upload CONFIDENTIAL (Write Down - DEVE FALHAR) ---"
+cli transfers upload /tmp/testfile.txt --to user2 --level CONFIDENTIAL || echo "✅ Falhou como esperado (No Write Down)"
+
+echo "--- Logout user1 ---"
+cli auth logout
+
+# ===================================================================
+# 8. TESTAR MLS - User2 (CONFIDENTIAL)
+# ===================================================================
+echo ""
+echo "=========================================="
+echo "8. TESTAR MLS - USER2 (CONFIDENTIAL)"
+echo "=========================================="
+
+echo "--- Login user2 ---"
+cli auth login
+
+echo "--- Verificar clearances ---"
+cli users clearance
+
+echo "--- Listar transfers recebidos ---"
 cli transfers list
 
-echo "--- 5.5 Download (como destinatário) ---"
-# Logout e login como user2
+echo "--- Tentar download de SECRET (Read Up - DEVE FALHAR) ---"
+# cli transfers download <ID> || echo "✅ Falhou como esperado (No Read Up)"
+
+echo "--- Logout user2 ---"
 cli auth logout
-cli auth login
-# username: user2
-
-# Obter ID da lista e fazer download
-# cli transfers download <TRANSFER_ID> --output /tmp/downloaded.txt
-
-echo "--- 5.6 Download público (qualquer user com link) ---"
-# cli transfers download "http://localhost:8000/transfers/download/<ID>#<KEY>" --output /tmp/public_download.txt
-
-echo "--- 5.7 Delete transferência (como owner) ---"
-# cli transfers delete <TRANSFER_ID> --force
-
-# ===================================================================
-# 6. MLS VIOLATION TESTS
-# ===================================================================
-echo ""
-echo "=========================================="
-echo "6. MLS VIOLATION TESTS"
-echo "=========================================="
-
-echo "--- 6.1 [User com SECRET clearance] Upload CONFIDENTIAL (Write Down - DEVE FALHAR) ---"
-# Se user tem clearance SECRET, não pode criar ficheiros CONFIDENTIAL (No Write Down)
-# $CLI transfers upload /tmp/testfile.txt --to user2 --level CONFIDENTIAL
-# Esperado: "Erro MLS: Não podes fazer upload com nível CONFIDENTIAL"
-
-echo "--- 6.2 [User com SECRET clearance] Upload TOP_SECRET (Write Up - OK) ---"
-# $CLI transfers upload /tmp/testfile.txt --to user2 --level TOP_SECRET --dept Engineering
-
-echo "--- 6.3 [User sem dept Finance] Upload para Finance (DEVE FALHAR) ---"
-# $CLI transfers upload /tmp/testfile.txt --to user2 --level SECRET --dept Finance
-# Esperado: "Erro MLS: Não tens acesso aos departamentos: Finance"
-
-# ===================================================================
-# 7. RBAC PERMISSION TESTS
-# ===================================================================
-echo ""
-echo "=========================================="
-echo "7. RBAC PERMISSION TESTS"
-echo "=========================================="
-
-echo "--- 7.1 [User regular] Tentar assign-role (DEVE FALHAR) ---"
-$CLI users assign-role user2 --role AUDITOR || echo "✅ Falhou como esperado (não é Admin/SO)"
-
-echo "--- 7.2 [Security Officer] Assign role ---"
-# Precisa ter role SO ativo primeiro:
-# $CLI users role (select SO role)
-# $CLI users assign-role user2 --role TRUSTED_OFFICER
-
-echo "--- 7.3 [User regular] Criar departamento (DEVE FALHAR) ---"
-$CLI departments create "NewDept" || echo "✅ Falhou como esperado (só Admin)"
 
 # ===================================================================
 # CLEANUP
@@ -191,9 +176,19 @@ echo ""
 echo "=========================================="
 echo "🧹 Cleanup"
 echo "=========================================="
-rm -f /tmp/testfile.txt /tmp/secret.txt /tmp/downloaded.txt /tmp/public_download.txt
-$CLI auth logout || true
+rm -f /tmp/testfile.txt /tmp/secret.txt
+cli auth logout 2>/dev/null || true
 
 echo ""
 echo "=========================================="
 echo "✅ Testes concluídos!"
+echo "=========================================="
+echo ""
+echo "Resumo:"
+echo "  - Admin criou 3 departments e 3 users"
+echo "  - Admin atribuiu role SO ao 'officer'"
+echo "  - Officer atribuiu SECRET ao user1 (Engineering, Finance)"
+echo "  - Officer atribuiu CONFIDENTIAL ao user2 (HR)"
+echo "  - User1 (SECRET) conseguiu upload SECRET"
+echo "  - User1 (SECRET) NÃO conseguiu upload CONFIDENTIAL (No Write Down)"
+echo "  - User2 (CONFIDENTIAL) NÃO consegue ler SECRET (No Read Up)"

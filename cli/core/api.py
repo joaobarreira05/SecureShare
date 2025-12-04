@@ -49,6 +49,23 @@ def api_activate(activation_data: dict) -> bool:
     except Exception:
         return False
 
+
+def api_get_vault(token: str) -> Optional[str]:
+    """
+    Obtém o vault (encrypted_private_key) do servidor.
+    Retorna o JSON string do vault ou None se falhar.
+    """
+    url = f"{BASE_URL}/users/me/vault"
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=10)
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        return data.get("encrypted_private_key")
+    except Exception:
+        return None
+
 def api_create_user(token: str, user_data: dict) -> bool:
     """
     Cria um novo utilizador no backend (Admin only).
@@ -266,6 +283,35 @@ def api_assign_role(
     
     try:
         # Backend expects {"signed_jwt": "<jwt_string>"}
+        resp = requests.put(url, verify=_get_verify(), json={"signed_jwt": signed_jwt}, headers=headers, timeout=10)
+        return resp.status_code == 204
+    except Exception:
+        return False
+
+
+def api_assign_clearance(
+    token: str,
+    user_id: int,
+    signed_jwt: str,
+    rbac_token: str
+) -> bool:
+    """
+    Atribui uma clearance (MLS Token) a um utilizador (SO only).
+    PUT /users/{user_id}/clearance
+    
+    Args:
+        token: Auth token
+        user_id: Target user ID
+        signed_jwt: The signed MLS JWT to assign
+        rbac_token: Caller's RBAC token (SO)
+    """
+    url = f"{BASE_URL}/users/{user_id}/clearance"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Role-Token": rbac_token
+    }
+    
+    try:
         resp = requests.put(url, verify=_get_verify(), json={"signed_jwt": signed_jwt}, headers=headers, timeout=10)
         return resp.status_code == 204
     except Exception:
