@@ -2,7 +2,7 @@
 import json
 from typing import Optional
 
-from .config import SESSION_FILE, MLS_TOKEN_FILE
+from .config import SESSION_FILE, MLS_TOKEN_FILE, RBAC_TOKEN_FILE
 
 
 def save_token(access_token: str) -> None:
@@ -27,7 +27,6 @@ def load_token() -> Optional[str]:
             data = json.load(f)
         return data.get("access_token")
     except Exception:
-        # Se der erro a ler o ficheiro, consideramos que não há sessão válida
         return None
 
 
@@ -39,6 +38,8 @@ def clear_token() -> None:
         SESSION_FILE.unlink()
     if MLS_TOKEN_FILE.exists():
         MLS_TOKEN_FILE.unlink()
+    if RBAC_TOKEN_FILE.exists():
+        RBAC_TOKEN_FILE.unlink()
 
 
 def save_mls_token(token: str) -> None:
@@ -63,3 +64,35 @@ def load_mls_token() -> Optional[str]:
         return data.get("mls_token")
     except Exception:
         return None
+
+
+def save_rbac_token(token: str) -> None:
+    """
+    Guarda o token RBAC (role) num ficheiro JSON.
+    """
+    data = {"rbac_token": token}
+    with open(RBAC_TOKEN_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+
+def load_rbac_token() -> Optional[str]:
+    """
+    Lê o token RBAC do ficheiro.
+    """
+    if not RBAC_TOKEN_FILE.exists():
+        return None
+
+    try:
+        with open(RBAC_TOKEN_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("rbac_token")
+    except Exception:
+        return None
+
+
+def clear_rbac_token() -> None:
+    """
+    Limpa o token RBAC.
+    """
+    if RBAC_TOKEN_FILE.exists():
+        RBAC_TOKEN_FILE.unlink()

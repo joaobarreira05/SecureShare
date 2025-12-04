@@ -1,7 +1,14 @@
 import requests
 from typing import Optional, List
-from .config import BASE_URL
+from .config import BASE_URL, CA_CERT
 import json
+import os
+
+# Get verify setting - use CA cert if exists, else True (system certs)
+def _get_verify():
+    if CA_CERT and os.path.exists(CA_CERT):
+        return CA_CERT
+    return True  # Use system default
 
 def api_login(username: str, password: str) -> Optional[str]:
     """
@@ -11,7 +18,7 @@ def api_login(username: str, password: str) -> Optional[str]:
     data = {"username": username, "password": password}
     
     try:
-        resp = requests.post(url, json=data, timeout=5)
+        resp = requests.post(url, json=data, verify=_get_verify(), timeout=5)
         if resp.status_code != 200:
             return None
         return resp.json().get("access_token")
@@ -26,7 +33,7 @@ def api_logout(token: str) -> bool:
     headers = {"Authorization": f"Bearer {token}"}
     
     try:
-        resp = requests.post(url, headers=headers, timeout=5)
+        resp = requests.post(url, headers=headers, verify=_get_verify(), timeout=5)
         return resp.status_code == 200
     except Exception:
         return False
@@ -37,7 +44,7 @@ def api_activate(activation_data: dict) -> bool:
     """
     url = f"{BASE_URL}/auth/activate"
     try:
-        resp = requests.post(url, json=activation_data, timeout=10)
+        resp = requests.post(url, json=activation_data, verify=_get_verify(), timeout=10)
         return resp.status_code == 200
     except Exception:
         return False
@@ -50,7 +57,7 @@ def api_create_user(token: str, user_data: dict) -> bool:
     headers = {"Authorization": f"Bearer {token}"}
     
     try:
-        resp = requests.post(url, json=user_data, headers=headers, timeout=10)
+        resp = requests.post(url, json=user_data, headers=headers, verify=_get_verify(), timeout=10)
         return resp.status_code == 201
     except Exception:
         return False
@@ -62,7 +69,7 @@ def api_get_all_users(token: str) -> Optional[List[dict]]:
     url = f"{BASE_URL}/users"
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=10)
         if resp.status_code != 200:
             return None
         return resp.json()
@@ -88,7 +95,7 @@ def api_get_user_public_key(token: str, user_id: int) -> Optional[str]:
     url = f"{BASE_URL}/users/{user_id}/key"
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        resp = requests.get(url, headers=headers, timeout=5)
+        resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=5)
         if resp.status_code != 200:
             return None
         data = resp.json()
@@ -104,7 +111,7 @@ def api_get_user_clearances(token: str, user_id: int) -> Optional[dict]:
     url = f"{BASE_URL}/users/{user_id}/clearance"
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=10)
         if resp.status_code != 200:
             return None
         return resp.json()
@@ -118,7 +125,7 @@ def api_get_my_info(token: str) -> Optional[dict]:
     url = f"{BASE_URL}/user/me/info"
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        resp = requests.get(url, headers=headers, timeout=5)
+        resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=5)
         if resp.status_code != 200:
             return None
         return resp.json()
@@ -160,7 +167,7 @@ def api_upload_transfer(
                 "recipient_keys": json.dumps(recipient_keys),
                 "expires_in_days": expires_in_days
             }
-            resp = requests.post(url, headers=headers, files=files, data=data, timeout=60)
+            resp = requests.post(url, headers=headers, files=files, data=data, verify=_get_verify(), timeout=60)
         
         if resp.status_code in (200, 201):
             try:
@@ -181,7 +188,7 @@ def api_get_transfer(token: str, transfer_id: str, mls_token: Optional[str] = No
     if mls_token:
         headers["X-MLS-Token"] = mls_token
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=10)
         if resp.status_code != 200:
             return None
         return resp.json()
@@ -198,7 +205,7 @@ def api_download_encrypted_file(token: str, transfer_id: str, mls_token: Optiona
     if mls_token:
         headers["X-MLS-Token"] = mls_token
     try:
-        resp = requests.get(url, headers=headers, timeout=30)
+        resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=30)
         if resp.status_code != 200:
             return None
         return resp.content
@@ -214,7 +221,7 @@ def api_list_transfers(token: str, mls_token: Optional[str] = None) -> Optional[
     if mls_token:
         headers["X-MLS-Token"] = mls_token
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=10)
         if resp.status_code != 200:
             return None
         return resp.json()
@@ -230,7 +237,108 @@ def api_delete_transfer(token: str, transfer_id: str, mls_token: Optional[str] =
     if mls_token:
         headers["X-MLS-Token"] = mls_token
     try:
-        resp = requests.delete(url, headers=headers, timeout=10)
+        resp = requests.delete(url, headers=headers, verify=_get_verify(), timeout=10)
         return resp.status_code in (200, 204)
+    except Exception:
+        return False
+
+
+def api_assign_role(
+    token: str,
+    user_id: int,
+    signed_jwt: str,
+    rbac_token: Optional[str] = None
+) -> bool:
+    """
+    Atribui um role a um utilizador (Admin or SO).
+    PUT /users/{user_id}/role
+    
+    Args:
+        token: Auth token
+        user_id: Target user ID
+        signed_jwt: The signed RBAC JWT to assign
+        rbac_token: Caller's RBAC token (for SO)
+    """
+    url = f"{BASE_URL}/users/{user_id}/role"
+    headers = {"Authorization": f"Bearer {token}"}
+    if rbac_token:
+        headers["X-Role-Token"] = rbac_token
+    
+    try:
+        # Backend expects {"signed_jwt": "<jwt_string>"}
+        resp = requests.put(url, verify=_get_verify(), json={"signed_jwt": signed_jwt}, headers=headers, timeout=10)
+        return resp.status_code == 204
+    except Exception:
+        return False
+
+
+def api_revoke_token(
+    token: str,
+    user_id: int,
+    token_id: str,
+    revocation_token: dict,
+    rbac_token: str
+) -> bool:
+    """
+    Revoga um token (SO only).
+    PUT /users/{user_id}/revoke/{token_id}
+    
+    Args:
+        token: Auth token
+        user_id: User whose token is being revoked
+        token_id: JTI of the token to revoke
+        revocation_token: The revocation object
+        rbac_token: Caller's SO RBAC token
+    """
+    url = f"{BASE_URL}/users/{user_id}/revoke/{token_id}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Role-Token": rbac_token
+    }
+    
+    try:
+        resp = requests.put(url, verify=_get_verify(), json=revocation_token, headers=headers, timeout=10)
+        return resp.status_code == 204
+    except Exception:
+        return False
+
+
+def api_list_departments(token: str) -> Optional[List[dict]]:
+    """
+    Lista todos os departamentos (Admin only).
+    """
+    url = f"{BASE_URL}/departments"
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=10)
+        if resp.status_code != 200:
+            return None
+        return resp.json()
+    except Exception:
+        return None
+
+
+def api_create_department(token: str, name: str) -> bool:
+    """
+    Cria um novo departamento (Admin only).
+    """
+    url = f"{BASE_URL}/departments"
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        resp = requests.post(url, json={"name": name}, headers=headers, verify=_get_verify(), timeout=10)
+        return resp.status_code == 201
+    except Exception:
+        return False
+
+
+def api_delete_department(token: str, dept_id: int) -> bool:
+    """
+    Apaga um departamento (Admin only).
+    """
+    url = f"{BASE_URL}/departments/{dept_id}"
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        resp = requests.delete(url, headers=headers, verify=_get_verify(), timeout=10)
+        return resp.status_code == 204
     except Exception:
         return False

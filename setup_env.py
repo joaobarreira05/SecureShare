@@ -1,6 +1,7 @@
 import os
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
+import secrets
 
 def generate_rsa_keys():
     print("Generating RSA Key Pair (4096 bits)...")
