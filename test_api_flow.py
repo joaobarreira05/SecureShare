@@ -10,7 +10,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 BASE_URL = "https://127.0.0.1:8000"
 ADMIN_USER = "admin"
-ADMIN_PASS = "admin"
+ADMIN_PASS = "adminadmin"
 CA_CERT = os.path.abspath("certs/ca.crt")
 os.environ["REQUESTS_CA_BUNDLE"] = CA_CERT
 print(f"DEBUG: CA_CERT path: {CA_CERT}")

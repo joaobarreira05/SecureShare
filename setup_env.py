@@ -41,6 +41,7 @@ def setup_env():
         env_content = f.read()
 
     private_key, public_key = generate_rsa_keys()
+    pepper = secrets.token_urlsafe(32) # Generate a random pepper
 
     # Replace placeholders (or append if not present in example as placeholders)
     # Since .env.example has empty strings for keys, we can replace them using string formatting or simple replacement if we know the structure.
@@ -52,6 +53,8 @@ def setup_env():
             new_lines.append(f'SERVER_PRIVATE_KEY="{private_key}"')
         elif line.startswith("SERVER_PUBLIC_KEY="):
             new_lines.append(f'SERVER_PUBLIC_KEY="{public_key}"')
+        elif line.startswith("PASSWORD_PEPPER="): # Added condition for PASSWORD_PEPPER
+            new_lines.append(f'PASSWORD_PEPPER="{pepper}"')
         else:
             new_lines.append(line)
             

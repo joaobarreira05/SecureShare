@@ -11,16 +11,24 @@ from ..models.User import User, UserActivate
 from ..models.JWTAuthToken import TokenPayload
 
 # Password hashing
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["argon2"], 
+    deprecated="auto",
+    argon2__time_cost=2, 
+    argon2__memory_cost=102400, 
+    argon2__parallelism=8
+)
 
 # OAuth2 scheme (for extracting token from header)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    # print(f"DEBUG: Verifying with pepper: {settings.PASSWORD_PEPPER}")
+    return pwd_context.verify(plain_password + settings.PASSWORD_PEPPER, hashed_password)
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    print(f"DEBUG: Hashing with pepper: {settings.PASSWORD_PEPPER}")
+    return pwd_context.hash(password + settings.PASSWORD_PEPPER)
 
 from ..models.JWTAuthToken import JWTAuthToken
 

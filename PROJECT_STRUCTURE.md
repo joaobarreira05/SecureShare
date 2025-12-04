@@ -14,7 +14,9 @@ This document outlines the file structure of the SecureShare project and the res
 │       ├── core/                           # Core application configuration
 │       │   ├── __init__.py                 # Makes the directory a package
 │       │   ├── config.py                   # (Deprecated) Old config file
+│       │   ├── crypto.py                   # Cryptographic utilities (Key generation)
 │       │   ├── database.py                 # Database connection and session management
+│       │   ├── init_db.py                  # Database initialization script
 │       │   └── settings.py                 # Application settings (Database URL, Secrets, Token expiry)
 │       ├── departments/                    # Departments module
 │       │   ├── __init__.py                 # Makes the directory a package
@@ -23,13 +25,27 @@ This document outlines the file structure of the SecureShare project and the res
 │       ├── models/                         # Database Models & DTOs (SQLModel)
 │       │   ├── __init__.py                 # Makes the directory a package
 │       │   ├── JWTAuthToken.py             # JWT Token database model
+│       │   ├── JWTMLSToken.py              # MLS Token database model
+│       │   ├── JWTRBACToken.py             # RBAC Token database model
+│       │   ├── JWTRevocationToken.py       # Token revocation database model
+│       │   ├── Role.py                     # Role definitions
 │       │   └── User.py                     # User model and related DTOs
+│       ├── transfers/                      # Transfers module (File Sharing)
+│       │   ├── __init__.py                 # Makes the directory a package
+│       │   ├── dependencies.py             # MLS security checks (No Read Up, No Write Down)
+│       │   ├── router.py                   # API route definitions for transfers
+│       │   └── service.py                  # Business logic for transfers
 │       ├── users/                          # User Management module
 │       │   ├── __init__.py                 # Makes the directory a package
 │       │   ├── router.py                   # API route definitions (Create User, Vault operations)
 │       │   └── service.py                  # Business logic (User creation, Vault management)
 │       ├── __init__.py                     # Makes the directory a package
 │       └── main.py                         # Application entry point, initializes FastAPI app
+├── certs/                                  # Directory for SSL/TLS certificates
+│   ├── ca.crt                              # Root CA Certificate
+│   ├── ca.key                              # Root CA Private Key
+│   ├── server.crt                          # Server Certificate
+│   └── server.key                          # Server Private Key
 ├── cli/                                    # Command Line Interface application
 │   ├── auth/                               # CLI Authentication module
 │   │   ├── __init__.py                     # Makes the directory a package
@@ -49,17 +65,23 @@ This document outlines the file structure of the SecureShare project and the res
 │   ├── __init__.py                         # Makes the directory a package
 │   └── main.py                             # CLI entry point (Typer app)
 ├── data/                                   # Directory for storing local data (SQLite DB, files)
+├── storage/                                # Directory for uploaded files
 ├── venv/                                   # Python virtual environment
+├── .env                                    # Environment variables
+├── .env.example                            # Example environment variables
 ├── .gitignore                              # Git ignore rules
 ├── CLIauthandvault.md                      # Documentation on CLI Auth and Vault
+├── certificates_docs.md                    # Documentation on CA and HTTPS setup
+├── generate_certs.sh                       # Script to generate CA and Server certificates
 ├── PROJECT_STRUCTURE.md                    # This file
 ├── README.md                               # Project documentation
+├── setup_env.py                            # Script to setup environment variables
 ├── SYSTEM_FLOWS.md                         # Detailed system flow documentation
 ├── requirements.txt                        # Python dependencies
 ├── secureshare.db                          # SQLite database file
-├── simulate_admin.py                       # Script to simulate admin actions
-├── test_auth_flow.py                       # Test script for auth flow
-└── test_departments_flow.py                # Test script for departments flow
+├── test_api_flow.py                        # Comprehensive API test script (Success & Failure scenarios)
+├── verify_rs256.py                         # Utility to verify RS256 token signing
+└── ...
 ```
 
 ## Module Responsibilities
@@ -67,19 +89,26 @@ This document outlines the file structure of the SecureShare project and the res
 ### Backend (`backend/app`)
 - **`auth/`**: Handles everything related to user identity and session.
     - **`router.py`**: Endpoints for `login`, `logout`, and `activate`.
-    - **`service.py`**: Core logic for authentication, including **Argon2** password hashing, JWT token generation/validation, and user activation logic.
+    - **`service.py`**: Core logic for authentication, including **Argon2** password hashing, JWT token generation/validation (RS256), and user activation logic.
 - **`departments/`**: Manages department-related data.
     - **`router.py`**: Endpoints for department operations.
     - **`service.py`**: Logic for handling department data.
+- **`transfers/`**: Manages file transfers and MLS security.
+    - **`router.py`**: Endpoints for uploading, downloading, and listing files.
+    - **`service.py`**: Logic for file handling and metadata storage.
+    - **`dependencies.py`**: Implements **MLS Security Policies** (Bell-LaPadula: No Read Up, No Write Down) and Trusted Officer bypass logic.
 - **`models/`**: Contains all SQLModel classes (Database Entities) and Pydantic models (DTOs).
     - **`User.py`**: Defines the `User` table and DTOs like `UserCreate`, `LoginRequest`.
     - **`JWTAuthToken.py`**: Defines the `JWTAuthToken` table for stateful token tracking.
+    - **`JWTMLSToken.py`**: Defines the structure for MLS tokens.
+    - **`JWTRBACToken.py`**: Defines the structure for RBAC tokens.
 - **`users/`**: Handles user-specific operations.
     - **`router.py`**: Endpoints for creating users (Admin only) and vault management (`GET/PUT /users/me/vault`).
     - **`service.py`**: Logic for creating users (hashing OTPs) and managing user vaults.
 - **`core/`**: Contains infrastructure code.
     - **`settings.py`**: Centralized configuration (Secrets, Database URL, Algorithm).
     - **`database.py`**: Database connection setup (`create_engine`) and session dependency (`get_session`).
+    - **`crypto.py`**: Utilities for generating RSA keys.
 - **`main.py`**: The application entry point. Configures FastAPI, includes all routers, and handles startup/shutdown events.
 
 ### CLI (`cli/`)
@@ -95,7 +124,9 @@ This document outlines the file structure of the SecureShare project and the res
 - **`main.py`**: The main Typer application that aggregates all commands and sub-commands.
 
 ### Root Files
+- **`certificates_docs.md`**: Detailed explanation of the CA setup and HTTPS implementation.
+- **`generate_certs.sh`**: Shell script to generate the Root CA and sign Server certificates.
+- **`test_api_flow.py`**: A comprehensive test suite that verifies the entire API flow, including Authentication, User Management, and Transfers (with MLS/RBAC checks), supporting HTTPS.
+- **`setup_env.py`**: Automates the setup of the `.env` file.
 - **`SYSTEM_FLOWS.md`**: Detailed explanation of the system's operational flows (Login, Create User, Activate, etc.).
-- **`simulate_admin.py`**: A utility script to perform admin actions or seed data for testing.
-- **`test_*.py`**: Standalone scripts to test specific flows (Auth, Departments) end-to-end.
-- **`requirements.txt`**: Lists all Python dependencies, including `fastapi`, `sqlmodel`, `typer`, and `argon2-cffi`.
+- **`requirements.txt`**: Lists all Python dependencies, including `fastapi`, `sqlmodel`, `typer`, `argon2-cffi`, `python-jose`, and `cryptography`.

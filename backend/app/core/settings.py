@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     SERVER_PRIVATE_KEY: str
     SERVER_PUBLIC_KEY: str
     
+    # Security
+    PASSWORD_PEPPER: str
+
     # Admin ConfigHardcoded Credentials
     ADMIN_USERNAME: str 
     ADMIN_PASSWORD: str
