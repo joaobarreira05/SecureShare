@@ -2,7 +2,7 @@
 import json
 from typing import Optional
 
-from .config import SESSION_FILE
+from .config import SESSION_FILE, MLS_TOKEN_FILE
 
 
 def save_token(access_token: str) -> None:
@@ -37,3 +37,29 @@ def clear_token() -> None:
     """
     if SESSION_FILE.exists():
         SESSION_FILE.unlink()
+    if MLS_TOKEN_FILE.exists():
+        MLS_TOKEN_FILE.unlink()
+
+
+def save_mls_token(token: str) -> None:
+    """
+    Guarda o token MLS (clearance) num ficheiro JSON.
+    """
+    data = {"mls_token": token}
+    with open(MLS_TOKEN_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+
+def load_mls_token() -> Optional[str]:
+    """
+    Lê o token MLS do ficheiro.
+    """
+    if not MLS_TOKEN_FILE.exists():
+        return None
+
+    try:
+        with open(MLS_TOKEN_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("mls_token")
+    except Exception:
+        return None
