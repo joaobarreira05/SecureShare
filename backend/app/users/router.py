@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import Session
+from sqlmodel import Session, SQLModel
 from ..core.database import get_session
 from ..models.User import VaultContent, VaultUpdate, UserCreate, UserResponse
 from .service import create_user, get_all_users
-from ..auth.service import get_current_active_admin, get_current_user
+from ..auth.service import get_current_active_admin, get_current_user, check_if_admin_or_security_officer, check_if_security_officer
 from ..models.User import User
 from .service import delete_user, update_vault
 router = APIRouter(prefix="/users", tags=["users"])
@@ -64,7 +64,7 @@ async def update_user_vault(
 from ..models.JWTRBACToken import JWTRBACToken
 from ..models.JWTRevocationToken import JWTRevocationToken
 from .service import verify_and_store_role_token, verify_and_store_revocation_token
-from ..auth.service import check_if_admin_or_security_officer, check_if_security_officer
+
 
 class TokenCreate(SQLModel):
     signed_jwt: str

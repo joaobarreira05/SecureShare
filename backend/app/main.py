@@ -17,7 +17,7 @@ from .auth.router import router as auth_router
 from .users.router import router as users_router
 from .departments.router import router as departments_router
 from .user.router import router as user_router
-from transfers.router import router as transfers_router
+from .transfers.router import router as transfers_router
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
 

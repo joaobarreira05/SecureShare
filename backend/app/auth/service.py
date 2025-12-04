@@ -288,6 +288,7 @@ async def get_current_clearance(
             raise HTTPException(status_code=400, detail="Issuer not found")
 
         # 3. Verify Signature
+        print(f"DEBUG: Verifying with Public Key: {issuer.public_key!r}")
         jwt.decode(x_mls_token, issuer.public_key, algorithms=["RS256"])
 
         # 4. Check Revocation
@@ -301,3 +302,14 @@ async def get_current_clearance(
         raise HTTPException(status_code=400, detail=f"Invalid MLS Token: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"MLS Token verification failed: {str(e)}")
+
+async def check_if_trusted_officer_or_none(
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Session = Depends(get_session),
+    x_role_token: Annotated[str | None, Header(alias="X-Role-Token")] = None
+) -> bool:
+    try:
+        await check_if_trusted_officer(current_user, session, x_role_token)
+        return True
+    except HTTPException:
+        return False
