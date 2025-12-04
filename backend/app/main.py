@@ -17,6 +17,7 @@ from .auth.router import router as auth_router
 from .users.router import router as users_router
 from .departments.router import router as departments_router
 from .user.router import router as user_router
+from transfers.router import router as transfers_router
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
 
@@ -24,6 +25,7 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(departments_router)
 app.include_router(user_router)
+app.include_router(transfers_router)
 
 @app.get("/")
 def read_root():

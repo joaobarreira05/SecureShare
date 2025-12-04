@@ -1,28 +1,15 @@
 # cli/main.py
-import typer
 
+
+import typer
 from cli.auth.commands import app as auth_app
 from cli.users.commands import app as users_app
+from cli.transfers.commands import app as transfers_app
 
-app = typer.Typer(help="SecureShare CLI")
-
-# adiciona o grupo 'auth'
+app = typer.Typer()
 app.add_typer(auth_app, name="auth")
-# adiciona o grupo 'users'
 app.add_typer(users_app, name="users")
-
-
-@app.command()
-def hello(name: str = "mundo"):
-    """
-    Comando de teste: diz olá.
-    """
-    typer.echo(f"Olá, {name}!")
-
-
-def main():
-    app()
-
+app.add_typer(transfers_app, name="transfers")
 
 if __name__ == "__main__":
-    main()
+    app()
