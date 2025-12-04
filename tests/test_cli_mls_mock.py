@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 from typer.testing import CliRunner
 from cli.transfers.commands import app
-from cli.users.commands import app as users_app
 
 runner = CliRunner()
 
@@ -25,30 +24,29 @@ class TestCLIMLS(unittest.TestCase):
     @patch("cli.transfers.commands.load_mls_token")
     @patch("cli.transfers.commands.api_upload_transfer")
     @patch("cli.transfers.commands.api_get_user_public_key")
+    @patch("cli.transfers.commands.api_get_user_by_username")
     @patch("cli.transfers.commands.encrypt_file_key_for_user")
-    def test_upload_mls_success(self, mock_encrypt_key, mock_get_key, mock_upload, mock_load_mls, mock_load_token):
+    def test_upload_mls_success(self, mock_encrypt_key, mock_get_user, mock_get_key, mock_upload, mock_load_mls, mock_load_token):
         mock_load_token.return_value = self.token
         mock_load_mls.return_value = self.mls_token
+        mock_get_user.return_value = {"id": 2, "username": "user2"}
         mock_get_key.return_value = "fake_pem"
         mock_encrypt_key.return_value = b"encrypted_key"
         mock_upload.return_value = "fake_transfer_id"
         
-        # Create dummy file
         with open("test_file.txt", "w") as f:
             f.write("content")
             
-        # Try upload with valid level (SECRET <= SECRET) and valid dept (HR subset)
         result = runner.invoke(app, ["upload", "test_file.txt", "--to", "user2", "--level", "SECRET", "--dept", "HR"])
         if result.exit_code != 0:
             print(result.stdout, file=sys.stderr)
         self.assertEqual(result.exit_code, 0)
         self.assertIn("Transferência enviada com sucesso", result.stdout)
         
-        # Verify API call args
-        args, kwargs = mock_upload.call_args
-        transfer_data = args[1]
-        self.assertEqual(transfer_data["classification"]["level"], "SECRET")
-        self.assertEqual(transfer_data["classification"]["departments"], ["HR"])
+        # Verify api_upload_transfer was called with correct classification
+        _, kwargs = mock_upload.call_args
+        self.assertEqual(kwargs["classification"], "SECRET")
+        self.assertEqual(kwargs["departments"], ["HR"])
         self.assertEqual(kwargs["mls_token"], self.mls_token)
 
         Path("test_file.txt").unlink()
@@ -62,11 +60,6 @@ class TestCLIMLS(unittest.TestCase):
         with open("test_file.txt", "w") as f:
             f.write("content")
             
-        # Try upload with higher level (TOP_SECRET > SECRET) -> Should Fail?
-        # Wait, rule is: User Level <= File Level.
-        # So if User is SECRET, File is TOP_SECRET -> OK (Write Up).
-        # If User is SECRET, File is CONFIDENTIAL -> FAIL (Write Down).
-        
         # Test Write Down Violation: File Level (CONFIDENTIAL) < User Level (SECRET)
         result = runner.invoke(app, ["upload", "test_file.txt", "--to", "user2", "--level", "CONFIDENTIAL"])
         self.assertNotEqual(result.exit_code, 0)
@@ -97,7 +90,7 @@ class TestCLIMLS(unittest.TestCase):
     @patch("cli.transfers.commands.api_upload_transfer")
     def test_upload_public(self, mock_upload, mock_load_mls, mock_load_token):
         mock_load_token.return_value = self.token
-        mock_load_mls.return_value = None # No MLS token needed for public? Or maybe optional.
+        mock_load_mls.return_value = None
         mock_upload.return_value = "fake_public_id"
         
         with open("test_file.txt", "w") as f:
@@ -106,13 +99,11 @@ class TestCLIMLS(unittest.TestCase):
         result = runner.invoke(app, ["upload", "test_file.txt", "--public"])
         self.assertEqual(result.exit_code, 0)
         self.assertIn("Transferência enviada com sucesso", result.stdout)
-        self.assertIn("Chave para partilha (fragmento): #", result.stdout)
+        self.assertIn("Link público:", result.stdout)
         
-        # Verify encrypted_keys is empty
-        args, _ = mock_upload.call_args
-        transfer_data = args[1]
-        self.assertEqual(transfer_data["encrypted_keys"], {})
-        self.assertTrue(transfer_data["is_public"])
+        # Verify recipient_keys is empty
+        _, kwargs = mock_upload.call_args
+        self.assertEqual(kwargs["recipient_keys"], [])
         
         Path("test_file.txt").unlink()
 
@@ -125,13 +116,15 @@ class TestCLIMLS(unittest.TestCase):
         mock_load_token.return_value = self.token
         mock_load_mls.return_value = None
         
-        # Mock metadata
+        # Mock metadata - now no cipher/nonce in response, just filename
         mock_get_transfer.return_value = {
-            "cipher": "AES-256-GCM",
-            "nonce": base64.b64encode(b"nonce").decode(),
-            "encrypted_file_key": None # Public share might not have it for us
+            "filename": "test.txt",
+            "encrypted_key": None
         }
-        mock_download_file.return_value = b"encrypted_content"
+        # Nonce is prepended to the blob (12 bytes)
+        nonce = b"x" * 12
+        encrypted_content = b"encrypted_content"
+        mock_download_file.return_value = nonce + encrypted_content
         mock_decrypt.return_value = b"decrypted_content"
         
         # Fake URL with fragment

@@ -1,21 +1,22 @@
 from pathlib import Path
 from typing import List, Optional
+import tempfile
+import os
 
 import typer
 import base64
 import json
-import getpass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from cli.core.session import load_token, load_mls_token
 from cli.core.api import (
+    api_get_user_by_username,
     api_get_user_public_key,
     api_upload_transfer,
     api_get_transfer,
     api_download_encrypted_file,
     api_list_transfers,
     api_delete_transfer,
-
 )
 from cli.core.crypto import (
     generate_file_key,
@@ -25,7 +26,6 @@ from cli.core.crypto import (
     load_private_key_from_vault
 )
 from cli.core.config import VAULT_FILE, BASE_URL
-from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 
@@ -49,7 +49,6 @@ def upload(
     level: str = typer.Option("UNCLASSIFIED", "--level", "-l", help="Nível de segurança (TOP_SECRET, SECRET, CONFIDENTIAL, UNCLASSIFIED)"),
     departments: Optional[List[str]] = typer.Option(None, "--dept", "-d", help="Departamentos associados"),
     expire_days: int = typer.Option(7, "--expire-days", help="Dias para expirar"),
-    expire_hours: int = typer.Option(0, "--expire-hours", help="Horas para expirar"),
     public: bool = typer.Option(False, "--public", help="Criar partilha pública (link com chave)"),
 ):
     """
@@ -79,12 +78,8 @@ def upload(
         raise typer.Exit(code=1)
 
     # --- MLS Checks (Client Side) ---
-    # Só fazemos checks se tivermos um token MLS carregado.
-    # Se não tiver, assumimos que o user sabe o que faz ou o backend rejeita.
-    # Mas o enunciado diz "Users may provide a clearance object...".
     if mls_token:
         try:
-            # Decode inseguro só para ler claims
             payload_b64 = mls_token.split(".")[1]
             payload_b64 += "=" * (-len(payload_b64) % 4)
             payload = json.loads(base64.urlsafe_b64decode(payload_b64))
@@ -92,29 +87,22 @@ def upload(
             user_level = payload.get("clearance", "UNCLASSIFIED")
             user_depts = set(payload.get("departments", []))
             
-            # 1. No Write Down: File Level >= User Level
-            # "A user can upload a file only if their clearance level is less than or equal to the file’s classification level"
-            # Ou seja: User Level <= File Level.
+            # No Write Down: User Level <= File Level
             if LEVEL_MAP.get(user_level, 1) > LEVEL_MAP.get(level, 1):
                 typer.echo(f"Erro MLS: Não podes fazer upload com nível {level} (o teu nível é {user_level}). Regra: User Level <= File Level.")
                 raise typer.Exit(code=1)
 
-            # 2. Departments Subset: File Depts ⊆ User Depts (Upload Constraints)
-            # "A set of departments that is a subset of their own authorized departments."
+            # Departments Subset
             file_depts = set(departments or [])
             if not file_depts.issubset(user_depts):
                 missing = file_depts - user_depts
                 typer.echo(f"Erro MLS: Não tens acesso aos departamentos: {', '.join(missing)}")
                 raise typer.Exit(code=1)
 
+        except typer.Exit:
+            raise
         except Exception as e:
             typer.echo(f"Aviso: Não foi possível validar regras MLS localmente ({e}). O backend fará a validação final.")
-
-    # --- Expiração ---
-    expiration_delta = timedelta(days=expire_days, hours=expire_hours)
-    # Usar timezone-aware UTC para evitar warnings
-    from datetime import timezone
-    expires_at = (datetime.now(timezone.utc) + expiration_delta).isoformat()
 
     # 1) Ler ficheiro
     file_bytes = path.read_bytes()
@@ -124,52 +112,69 @@ def upload(
 
     # 3) Cifrar ficheiro com AES-GCM
     nonce, encrypted_file = encrypt_file_with_aes_gcm(file_bytes, file_key)
+    
+    # Prepend nonce to encrypted file (backend should store this way or we send separately)
+    # Backend model doesn't have nonce field - it expects nonce prepended to file.
+    encrypted_blob = nonce + encrypted_file
 
-    # 4) Tratar Chaves (Público vs Privado)
-    encrypted_keys: dict[str, str] = {}
+    # 4) Resolver recipients -> IDs e cifrar chaves
+    recipient_keys: List[dict] = []
     
     if not public and recipients:
         for username in recipients:
-            pubkey_pem = api_get_user_public_key(token, username)
+            # Obter user info por username
+            user_info = api_get_user_by_username(token, username)
+            if not user_info:
+                typer.echo(f"Utilizador '{username}' não encontrado.")
+                raise typer.Exit(code=1)
+            
+            user_id = user_info.get("id")
+            if not user_id:
+                typer.echo(f"Falha ao obter ID do utilizador '{username}'.")
+                raise typer.Exit(code=1)
+
+            # Obter public key
+            pubkey_pem = api_get_user_public_key(token, user_id)
             if not pubkey_pem:
                 typer.echo(f"Falha ao obter a chave pública de '{username}'.")
                 raise typer.Exit(code=1)
 
             encrypted_key_bytes = encrypt_file_key_for_user(file_key, pubkey_pem)
-            encrypted_keys[username] = base64.b64encode(encrypted_key_bytes).decode("utf-8")
-
-    # 5) Construir payload
-    transfer_data = {
-        "filename": path.name,
-        "cipher": "AES-256-GCM",
-        "nonce": base64.b64encode(nonce).decode("utf-8"),
-        "encrypted_file": base64.b64encode(encrypted_file).decode("utf-8"),
-        "encrypted_keys": encrypted_keys,
-        "classification": {
-            "level": level,
-            "departments": departments or []
-        },
-        "expires_at": expires_at,
-        "is_public": public
-    }
-
-    # 6) Chamar API
-    # Passamos o mls_token se existir
-    transfer_id = api_upload_transfer(token, transfer_data, mls_token=mls_token)
-    
-    if transfer_id:
-        typer.echo("Transferência enviada com sucesso! 🚀")
-        if public:
-            # Gerar Link Público
-            # Agora já temos o ID retornado pelo backend
             
-            # Fragmento da chave
-            key_b64 = base64.urlsafe_b64encode(file_key).decode("utf-8")
-            typer.echo(f"Chave para partilha (fragmento): #{key_b64}")
-            typer.echo(f"Link completo: {BASE_URL}/download/{transfer_id}#{key_b64}")
-    else:
-        typer.echo("Falha ao enviar transferência (erro no backend ou na rede).")
-        raise typer.Exit(code=1)
+            recipient_keys.append({
+                "recipient_id": user_id,
+                "encrypted_key": base64.b64encode(encrypted_key_bytes).decode("utf-8")
+            })
+
+    # 5) Escrever ficheiro cifrado para temp file (para multipart upload)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".enc") as tmp:
+        tmp.write(encrypted_blob)
+        tmp_path = tmp.name
+
+    try:
+        # 6) Chamar API (multipart form)
+        transfer_id = api_upload_transfer(
+            token=token,
+            file_path=tmp_path,
+            classification=level,
+            departments=departments or [],
+            recipient_keys=recipient_keys,
+            expires_in_days=expire_days,
+            mls_token=mls_token
+        )
+        
+        if transfer_id:
+            typer.echo("Transferência enviada com sucesso! 🚀")
+            typer.echo(f"ID: {transfer_id}")
+            if public:
+                key_b64 = base64.urlsafe_b64encode(file_key).decode("utf-8")
+                typer.echo(f"Link público: {BASE_URL}/transfers/download/{transfer_id}#{key_b64}")
+        else:
+            typer.echo("Falha ao enviar transferência (erro no backend ou na rede).")
+            raise typer.Exit(code=1)
+    finally:
+        # Limpar ficheiro temporário
+        os.unlink(tmp_path)
 
 
 @app.command("download")
@@ -183,12 +188,7 @@ def download(
     ),
 ):
     """
-    Download E2EE de um ficheiro:
-    - vai buscar metadata + encrypted_file_key
-    - vai buscar o ficheiro cifrado
-    - abre o vault (pede password)
-    - usa a private key para desencriptar a File Key
-    - usa a File Key para desencriptar o ficheiro
+    Download E2EE de um ficheiro.
     """
     token = load_token()
     if not token:
@@ -198,49 +198,32 @@ def download(
     mls_token = load_mls_token()
 
     # Suporte para Link Público (URL com fragmento)
-    # Ex: http://.../download/<UUID>#<KEY_B64>
     public_key_fragment = None
     if "http" in transfer_id and "#" in transfer_id:
         try:
             url_part, fragment = transfer_id.split("#", 1)
             public_key_fragment = fragment
-            # Extrair ID do URL (assumindo formato .../download/<ID>)
             if "/download/" in url_part:
                 transfer_id = url_part.split("/download/")[-1]
             else:
-                # Tentar o último segmento
                 transfer_id = url_part.split("/")[-1]
         except Exception:
             pass
 
-    # 1) Obter metadata + encrypted_file_key
+    # 1) Obter metadata
     meta = api_get_transfer(token, transfer_id, mls_token=mls_token)
     if not meta:
         typer.echo("Falha ao obter metadata da transferência.")
         raise typer.Exit(code=1)
 
     filename = meta.get("filename") or f"transfer_{transfer_id}"
-    cipher = meta.get("cipher")
-    if cipher != "AES-256-GCM":
-        typer.echo(f"Cipher não suportado: {cipher}")
-        raise typer.Exit(code=1)
-
-    nonce_b64 = meta.get("nonce")
-    # encrypted_file_key_b64 = meta.get("encrypted_file_key") # Removido check obrigatório aqui, pois pode ser public
-    if not nonce_b64:
-        typer.echo("Resposta da API em falta (nonce).")
-        raise typer.Exit(code=1)
-
-    nonce = base64.b64decode(nonce_b64)
     
     file_key = None
+    encrypted_file_key = None
     
     # Se temos fragmento público, usamos diretamente
     if public_key_fragment:
         try:
-            # O fragmento é base64 url safe? O upload usou urlsafe_b64encode.
-            # Vamos tentar decode.
-            # Padding pode ser necessário.
             pk = public_key_fragment
             pk += "=" * (-len(pk) % 4)
             file_key = base64.urlsafe_b64decode(pk)
@@ -249,30 +232,32 @@ def download(
             typer.echo(f"Erro ao descodificar chave do link: {e}")
             raise typer.Exit(code=1)
     else:
-        # Fluxo normal (User-Specific)
-        encrypted_file_key_b64 = meta.get("encrypted_file_key")
-        if not encrypted_file_key_b64:
-             typer.echo("Esta transferência não tem chave cifrada para ti (e não forneceste chave pública).")
-             raise typer.Exit(code=1)
+        # Fluxo normal - encrypted_key vem da metadata
+        encrypted_key_b64 = meta.get("encrypted_key")
+        if not encrypted_key_b64:
+            typer.echo("Esta transferência não tem chave cifrada para ti.")
+            raise typer.Exit(code=1)
              
-        encrypted_file_key = base64.b64decode(encrypted_file_key_b64)
+        encrypted_file_key = base64.b64decode(encrypted_key_b64)
 
     # 2) Obter o ficheiro cifrado (blob)
-    encrypted_file = api_download_encrypted_file(token, transfer_id, mls_token=mls_token)
-    if encrypted_file is None:
+    encrypted_blob = api_download_encrypted_file(token, transfer_id, mls_token=mls_token)
+    if encrypted_blob is None:
         typer.echo("Falha ao descarregar o ficheiro cifrado.")
         raise typer.Exit(code=1)
 
+    # Nonce está prepended ao ficheiro (12 bytes para GCM)
+    nonce = encrypted_blob[:12]
+    encrypted_file = encrypted_blob[12:]
+
     # 3) Se ainda não temos file_key, desencriptar com RSA
     if not file_key:
-        # Abrir vault e obter private key
         try:
             private_key = load_private_key_from_vault()
         except Exception as e:
             typer.echo(f"Falha ao carregar a private key a partir do vault: {e}")
             raise typer.Exit(code=1)
 
-        # Desencriptar a File Key com RSA
         try:
             file_key = private_key.decrypt(
                 encrypted_file_key,
@@ -286,28 +271,27 @@ def download(
             typer.echo(f"Falha ao desencriptar a File Key: {e}")
             raise typer.Exit(code=1)
 
-    # 5) Desencriptar o ficheiro com AES-GCM
+    # 4) Desencriptar o ficheiro com AES-GCM
     try:
         plaintext = decrypt_file_with_aes_gcm(file_key, nonce, encrypted_file)
     except Exception as e:
         typer.echo(f"Falha ao desencriptar o ficheiro: {e}")
         raise typer.Exit(code=1)
 
-    # 6) Guardar o ficheiro em disco
+    # 5) Guardar o ficheiro em disco
     out_path = Path(output) if output else Path(filename)
     if out_path.exists():
         typer.echo(f"O ficheiro {out_path} já existe. Não vou sobrescrever.")
         raise typer.Exit(code=1)
 
     out_path.write_bytes(plaintext)
-    typer.echo(f"Ficheiro guardado em: {out_path} ")
+    typer.echo(f"Ficheiro guardado em: {out_path} ✅")
 
 
 @app.command("list")
 def list_transfers():
     """
     Lista as transferências criadas pelo utilizador atual.
-    Mostra: ID, filename, created_at, expires_at, nível (se existir).
     """
     token = load_token()
     if not token:
@@ -325,20 +309,17 @@ def list_transfers():
         typer.echo("Ainda não tens transferências criadas.")
         raise typer.Exit(code=0)
 
-    # Cabeçalho simples
-    typer.echo(f"{'ID':36}  {'Ficheiro':20}  {'Criado em':19}  {'Expira em':19}  {'Nível'}")
-    typer.echo("-" * 100)
+    typer.echo(f"{'ID':36}  {'Ficheiro':20}  {'Expira em':19}  {'Nível'}")
+    typer.echo("-" * 90)
 
     for t in transfers:
         tid = str(t.get("id", ""))[:36]
         filename = str(t.get("filename", ""))[:20]
-        created_at = str(t.get("created_at", ""))[:19]
         expires_at = str(t.get("expires_at", ""))[:19]
+        level = t.get("classification_level", "")
 
-        classification = t.get("classification") or {}
-        level = classification.get("level", "")
+        typer.echo(f"{tid:36}  {filename:20}  {expires_at:19}  {level}")
 
-        typer.echo(f"{tid:36}  {filename:20}  {created_at:19}  {expires_at:19}  {level}")
 
 @app.command("delete")
 def delete_transfer(
@@ -366,25 +347,10 @@ def delete_transfer(
             typer.echo("Operação cancelada.")
             raise typer.Exit(code=0)
 
-            typer.echo("Operação cancelada.")
-            raise typer.Exit(code=0)
-
     mls_token = load_mls_token()
-    ok = api_delete_transfer(token, transfer_id) # api_delete_transfer não foi atualizado para aceitar mls_token no api.py?
-    # Vamos verificar api.py. Eu atualizei api_upload, api_get, api_download, api_list.
-    # Esqueci-me de api_delete_transfer no api.py!
-    # Vou ter de atualizar api.py primeiro ou agora.
-    # Mas espera, delete precisa de MLS? "Access by authenticated users is always subject to MLS policy checks".
-    # Sim.
-    # Vou atualizar api.py para api_delete_transfer aceitar mls_token.
-    # E depois atualizar aqui.
-    # Por agora, vou deixar comentado ou fazer o update do api.py em paralelo?
-    # Não posso fazer em paralelo com multi_replace no mesmo ficheiro se não tiver a certeza.
-    # Vou assumir que vou atualizar api.py a seguir e já ponho aqui a chamada.
     ok = api_delete_transfer(token, transfer_id, mls_token=mls_token)
     if ok:
         typer.echo(f"Transferência '{transfer_id}' apagada com sucesso. 🗑️")
     else:
         typer.echo("Falha ao apagar transferência (erro na API ou permissões).")
         raise typer.Exit(code=1)
-
