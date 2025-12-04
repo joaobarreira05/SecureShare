@@ -2,12 +2,17 @@ from typing import Tuple
 
 import os
 import base64
+import json
+import getpass
 
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+
+from cli.core.config import VAULT_FILE
 
 def derive_key_from_password(password: str, salt: bytes, length: int = 32) -> bytes:
     """
@@ -100,3 +105,69 @@ def generate_rsa_keypair() -> Tuple[bytes, bytes]:
     )
 
     return private_pem, public_pem
+
+
+def load_private_key_from_vault() -> object:
+    """
+    Lê o vault local (~/.secureshare/vault.json),
+    pede password ao utilizador,
+    devolve um objeto private_key (RSA) pronto a usar.
+    """
+    # 1) Ler o vault
+    if not VAULT_FILE.exists():
+        raise FileNotFoundError("Vault não encontrado. Corre primeiro 'activate'.")
+
+    with open(VAULT_FILE, "r", encoding="utf-8") as f:
+        vault_obj = json.load(f)
+
+    # 2) Pedir password ao user
+    password = getpass.getpass("Password do vault: ")
+
+    # 3) Desencriptar
+    private_pem = decrypt_private_key_with_password(vault_obj, password)
+
+    # 4) Converter PEM → objeto private_key
+    private_key = load_pem_private_key(private_pem, password=None)
+
+    return private_key
+
+def generate_file_key() -> bytes:
+    """
+    Gera uma File Key simétrica AES-256 (32 bytes).
+    """
+    return os.urandom(32)
+
+def encrypt_file_with_aes_gcm(file_bytes: bytes, file_key: bytes) -> tuple[bytes, bytes]:
+    """
+    Cifra o ficheiro com AES-256-GCM.
+    Devolve (nonce, ciphertext).
+    """
+    nonce = os.urandom(12)
+    aesgcm = AESGCM(file_key)
+    ciphertext = aesgcm.encrypt(nonce, file_bytes, None)
+    return nonce, ciphertext
+
+def encrypt_file_key_for_user(file_key: bytes, user_public_key_pem: bytes) -> bytes:
+    """
+    Cifra a File Key com a public key de um destinatário (RSA-OAEP).
+    """
+    public_key = serialization.load_pem_public_key(user_public_key_pem)
+
+    encrypted_key = public_key.encrypt(
+        file_key,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+
+    return encrypted_key
+
+def decrypt_file_with_aes_gcm(file_key: bytes, nonce: bytes, ciphertext: bytes) -> bytes:
+    """
+    Desencripta um ficheiro cifrado com AES-256-GCM.
+    """
+    aesgcm = AESGCM(file_key)
+    plaintext = aesgcm.decrypt(nonce, ciphertext, associated_data=None)
+    return plaintext
