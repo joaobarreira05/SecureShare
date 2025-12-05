@@ -4,7 +4,8 @@ from typing import Optional, List
 import json
 import base64
 from datetime import datetime, timezone
-from cryptography.hazmat.primitives import serialization, hashes, padding
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
 from cli.core.session import load_token, save_mls_token, load_rbac_token, save_rbac_token
 from cli.core.api import api_create_user, api_delete_user, api_get_user_clearances, api_get_user_by_username, api_assign_role, api_get_my_info, api_assign_clearance, api_get_all_users, api_revoke_token
 from cli.core.rbac import create_rbac_payload, sign_rbac_token, decode_rbac_token, VALID_ROLES
@@ -494,7 +495,7 @@ def revoke_role(
     # Display tokens
     typer.echo(f"\nTRUSTED_OFFICER tokens for '{target_username}':")
     for i, tk in enumerate(trusted_officer_tokens, 1):
-        jti = tk.get("jti", "?")
+        jti = tk.get("id", "?")
         typer.echo(f"  {i}) Role: TRUSTED_OFFICER | JTI: {jti[:16]}...")
 
     # Select token if not provided
@@ -506,7 +507,7 @@ def revoke_role(
         raise typer.Exit(code=1)
 
     selected_token = trusted_officer_tokens[token_index - 1]
-    token_jti = selected_token.get("jti")
+    token_jti = selected_token.get("id")
     if not token_jti:
         typer.echo("Token has no JTI.")
         raise typer.Exit(code=1)
