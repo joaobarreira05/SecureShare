@@ -66,6 +66,10 @@ Lista e seleciona uma clearance MLS ativa.
 
 ```bash
 python3 -m cli.main users assign-role <USERNAME> --role <ROLE>
+
+python3 -m cli.main users assign-role user1 --role SECURITY_OFFICER
+
+python3 -m cli.main users assign-role user2 --role TRUSTED_OFFICER
 ```
 Atribui um role a um utilizador (requer Admin ou SO).
 Roles: ADMINISTRATOR, SECURITY_OFFICER, TRUSTED_OFFICER, AUDITOR, STANDARD_USER
