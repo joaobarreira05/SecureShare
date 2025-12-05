@@ -70,15 +70,20 @@ def upload(
         typer.echo(f"Ficheiro não encontrado: {filepath}")
         raise typer.Exit(code=1)
 
-    # Validar Nível
-    if level not in LEVEL_MAP:
-        typer.echo(f"Nível inválido. Opções: {', '.join(LEVEL_MAP.keys())}")
-        raise typer.Exit(code=1)
+    # Para transfers públicos: sem level/departments (sempre UNCLASSIFIED e vazio)
+    if public:
+        level = "UNCLASSIFIED"
+        departments = []
+    else:
+        # Validar Nível apenas para privados
+        if level not in LEVEL_MAP:
+            typer.echo(f"Nível inválido. Opções: {', '.join(LEVEL_MAP.keys())}")
+            raise typer.Exit(code=1)
 
     mls_token = load_mls_token()
     
-    # --- MLS Checks (Client Side) ---
-    if mls_token:
+    # --- MLS Checks (Client Side) - Apenas para partilhas privadas ---
+    if not public and mls_token:
         try:
             payload_b64 = mls_token.split(".")[1]
             payload_b64 += "=" * (-len(payload_b64) % 4)
@@ -152,7 +157,8 @@ def upload(
             departments=departments or [],
             recipient_keys=recipient_keys,
             expires_in_days=expire_days,
-            mls_token=mls_token
+            mls_token=mls_token,
+            is_public=public
         )
         
         if transfer_id:
@@ -223,6 +229,11 @@ def download(
         except Exception as e:
             typer.echo(f"Erro ao descodificar chave do link: {e}")
             raise typer.Exit(code=1)
+    elif meta.get("is_public"):
+        # Transfer é público mas não temos a chave - precisa do link completo
+        typer.echo("Esta é uma transferência pública. Usa o link completo com a chave:")
+        typer.echo(f"  python3 -m cli.main transfers download '<LINK_COM_CHAVE>'")
+        raise typer.Exit(code=1)
     else:
         # Fluxo normal - encrypted_key vem da metadata
         encrypted_key_b64 = meta.get("encrypted_key")

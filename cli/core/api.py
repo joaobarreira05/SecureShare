@@ -184,7 +184,8 @@ def api_upload_transfer(
     departments: List[str],
     recipient_keys: List[dict],
     expires_in_days: int = 7,
-    mls_token: Optional[str] = None
+    mls_token: Optional[str] = None,
+    is_public: bool = False
 ) -> Optional[str]:
     """
     Faz upload de uma transferência E2EE usando multipart form.
@@ -197,6 +198,7 @@ def api_upload_transfer(
         recipient_keys: Lista de [{recipient_id: int, encrypted_key: str}].
         expires_in_days: Dias até expiração.
         mls_token: Token MLS (opcional).
+        is_public: Se é partilha pública.
     """
     url = f"{BASE_URL}/transfers"
     headers = {"Authorization": f"Bearer {token}"}
@@ -210,7 +212,8 @@ def api_upload_transfer(
                 "classification": classification,
                 "departments": json.dumps(departments),
                 "recipient_keys": json.dumps(recipient_keys),
-                "expires_in_days": expires_in_days
+                "expires_in_days": expires_in_days,
+                "is_public": "true" if is_public else "false"
             }
             resp = requests.post(url, headers=headers, files=files, data=data, verify=_get_verify(), timeout=60)
         
