@@ -23,6 +23,7 @@ def create_transfer_service(
     departments: str,
     recipient_keys: str,
     expires_in_days: int,
+    is_public: bool = False,
     mls_payload: Optional[dict] = None,
     justification: Optional[str] = None,
     is_trusted_officer: bool = False
@@ -35,15 +36,16 @@ def create_transfer_service(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid departments format. Must be a JSON list of strings.")
 
-    # 1. MLS Write Check
-    check_mls_write(
-        user=user, 
-        classification=classification, 
-        departments=dept_list,
-        mls_payload=mls_payload,
-        justification=justification,
-        is_trusted_officer=is_trusted_officer
-    )
+    # 1. MLS Write Check - SKIP for public transfers
+    if not is_public:
+        check_mls_write(
+            user=user, 
+            classification=classification, 
+            departments=dept_list,
+            mls_payload=mls_payload,
+            justification=justification,
+            is_trusted_officer=is_trusted_officer
+        )
 
     # 2. Create Transfer Object
     new_transfer = Transfer(
@@ -52,7 +54,7 @@ def create_transfer_service(
         filename=file.filename,
         classification_level=classification,
         departments=departments,
-        is_public=False,
+        is_public=is_public,
         expires_at=datetime.utcnow() + timedelta(days=expires_in_days)
     )
     
@@ -102,30 +104,33 @@ def get_transfer_metadata_service(
     if not transfer:
         raise HTTPException(status_code=404, detail="Transfer not found")
 
-    # 1. MLS Read Check
+    # 1. MLS Read Check - SKIP for public transfers
     dept_list = json.loads(transfer.departments)
-    check_mls_read(
-        user=user, 
-        classification=transfer.classification_level, 
-        departments=dept_list,
-        mls_payload=mls_payload,
-        justification=justification,
-        is_trusted_officer=is_trusted_officer
-    )
+    if not transfer.is_public:
+        check_mls_read(
+            user=user, 
+            classification=transfer.classification_level, 
+            departments=dept_list,
+            mls_payload=mls_payload,
+            justification=justification,
+            is_trusted_officer=is_trusted_officer
+        )
 
     # 2. Check Expiration
     if transfer.expires_at and transfer.expires_at < datetime.utcnow():
         raise HTTPException(status_code=410, detail="Transfer expired")
 
-    # 3. Check permissions
-    user_key = db.exec(
-        select(TransferKey)
-        .where(TransferKey.transfer_id == transfer_id)
-        .where(TransferKey.recipient_id == user.id)
-    ).first()
+    # 3. Check permissions (public transfers don't need key check)
+    user_key = None
+    if not transfer.is_public:
+        user_key = db.exec(
+            select(TransferKey)
+            .where(TransferKey.transfer_id == transfer_id)
+            .where(TransferKey.recipient_id == user.id)
+        ).first()
 
-    if not user_key and transfer.uploader_id != user.id:
-         raise HTTPException(status_code=403, detail="Access denied. No key available for this user.")
+        if not user_key and transfer.uploader_id != user.id:
+             raise HTTPException(status_code=403, detail="Access denied. No key available for this user.")
 
     return {
         "id": transfer.id,
@@ -149,26 +154,28 @@ def get_transfer_file_stream_service(
     if not transfer:
         raise HTTPException(status_code=404, detail="Transfer not found")
 
-    # 1. MLS Read Check
+    # 1. MLS Read Check - SKIP for public transfers
     dept_list = json.loads(transfer.departments)
-    check_mls_read(
-        user=user, 
-        classification=transfer.classification_level, 
-        departments=dept_list,
-        mls_payload=mls_payload,
-        justification=justification,
-        is_trusted_officer=is_trusted_officer
-    )
+    if not transfer.is_public:
+        check_mls_read(
+            user=user, 
+            classification=transfer.classification_level, 
+            departments=dept_list,
+            mls_payload=mls_payload,
+            justification=justification,
+            is_trusted_officer=is_trusted_officer
+        )
 
-    # 2. Check permissions
-    user_key = db.exec(
-        select(TransferKey)
-        .where(TransferKey.transfer_id == transfer_id)
-        .where(TransferKey.recipient_id == user.id)
-    ).first()
+    # 2. Check permissions (public transfers are open)
+    if not transfer.is_public:
+        user_key = db.exec(
+            select(TransferKey)
+            .where(TransferKey.transfer_id == transfer_id)
+            .where(TransferKey.recipient_id == user.id)
+        ).first()
 
-    if not transfer.is_public and not user_key and transfer.uploader_id != user.id:
-        raise HTTPException(status_code=403, detail="Access denied.")
+        if not user_key and transfer.uploader_id != user.id:
+            raise HTTPException(status_code=403, detail="Access denied.")
 
     # 3. Stream file
     if not os.path.exists(transfer.blob_path):

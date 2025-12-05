@@ -20,6 +20,7 @@ async def create_transfer(
     departments: str = Form(...), # JSON string
     recipient_keys: str = Form(...), # JSON string
     expires_in_days: int = Form(7),
+    is_public: bool = Form(False),
     current_user: User = Depends(get_current_user),
     mls_payload: Optional[dict] = Depends(get_current_clearance),
     x_justification: Optional[str] = Header(None, alias="X-Justification"),
@@ -34,6 +35,7 @@ async def create_transfer(
         departments=departments,
         recipient_keys=recipient_keys,
         expires_in_days=expires_in_days,
+        is_public=is_public,
         mls_payload=mls_payload,
         justification=x_justification,
         is_trusted_officer=is_trusted_officer

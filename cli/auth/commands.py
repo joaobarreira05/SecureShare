@@ -6,10 +6,9 @@ import typer
 import json
 
 
-from cli.core.session import save_token, load_token, clear_token
-from cli.core.api import api_login, api_logout
+from cli.core.session import save_token, load_token, clear_token, is_logged_in
+from cli.core.api import api_login, api_logout, api_get_vault
 from cli.core.crypto import generate_rsa_keypair, encrypt_private_key_with_password
-from cli.core.config import VAULT_FILE, PUBLIC_KEY_FILE
 
 
 app = typer.Typer(help="Comandos de autenticação (login, logout)")
@@ -22,10 +21,13 @@ def login(
     username: str = typer.Option(None, "--username", "-u", help="Nome de utilizador"),
 ):
     """
-    Login:
-    - Fase 1: usa api_login() fake (sem backend)
-    - Fase 2: api_login() passa a chamar /auth/login
+    Login no sistema. Apenas permitido se não houver sessão ativa.
     """
+    # Verificar se já há sessão ativa
+    if is_logged_in():
+        typer.echo("Já existe uma sessão ativa. Faz logout primeiro.")
+        raise typer.Exit(code=1)
+
     if username is None:
         username = typer.prompt("Username")
 
@@ -42,7 +44,7 @@ def login(
         typer.echo("Password demasiado curta (mínimo 8 caracteres).")
         raise typer.Exit(code=1)
 
-    # 🔗 Chamada à “API” (neste momento, fake)
+    # Login no backend
     token = api_login(username, password)
 
     if token is None:
@@ -50,33 +52,35 @@ def login(
         raise typer.Exit(code=1)
 
     save_token(token)
-    typer.echo("Login efetuado com sucesso (token guardado).")
+    typer.echo(f"Login efetuado com sucesso como '{username}'.")
 
 
 @app.command("logout")
 def logout():
     """
-    Termina a sessão local e no backend.
+    Termina a sessão e apaga o token local.
     """
     token = load_token()
     if token:
         if api_logout(token):
             typer.echo("Logout efetuado no backend.")
         else:
-            typer.echo("Aviso: Falha ao fazer logout no backend (token inválido ou erro de rede).")
+            typer.echo("Aviso: Falha ao fazer logout no backend.")
     
     clear_token()
-    typer.echo("Sessão local terminada.")
+    typer.echo("Sessão terminada.")
+
 
 @app.command("activate")
 def activate():
     """
-    Ativa a conta localmente:
-    - Valida username, OTP, password.
-    - Gera par de chaves RSA.
-    - Encripta a chave privada com a password (vault).
-    - Guarda vault.json e public_key.pem em ~/.secureshare.
+    Ativa uma conta. Apenas permitido se não houver sessão ativa.
     """
+    # Verificar se já há sessão ativa
+    if is_logged_in():
+        typer.echo("Já existe uma sessão ativa. Faz logout primeiro.")
+        raise typer.Exit(code=1)
+
     username = typer.prompt("Username")
 
     if not USERNAME_REGEX.match(username):
@@ -122,16 +126,9 @@ def activate():
         typer.echo("Falha na ativação. Verifica o OTP e o username.")
         raise typer.Exit(code=1)
 
-    # Guardar vault.json
-    with open(VAULT_FILE, "w", encoding="utf-8") as f:
-        json.dump(vault_obj, f, indent=2)
-
-    # Guardar chave pública
-    with open(PUBLIC_KEY_FILE, "wb") as f:
-        f.write(public_pem)
-
-    typer.echo(f"Vault criado em: {VAULT_FILE}")
-    typer.echo(f"Chave pública guardada em: {PUBLIC_KEY_FILE}")
     typer.echo("Ativação concluída com sucesso.")
+    typer.echo("O vault está guardado no servidor. Podes agora fazer login.")
+
+
 
 

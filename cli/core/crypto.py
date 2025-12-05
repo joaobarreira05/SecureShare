@@ -12,8 +12,6 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 
-from cli.core.config import VAULT_FILE
-
 def derive_key_from_password(password: str, salt: bytes, length: int = 32) -> bytes:
     """
     Deriva uma chave simétrica a partir de uma password usando PBKDF2-HMAC-SHA256.
@@ -109,24 +107,38 @@ def generate_rsa_keypair() -> Tuple[bytes, bytes]:
 
 def load_private_key_from_vault() -> object:
     """
-    Lê o vault local (~/.secureshare/vault.json),
+    Busca o vault do servidor via API,
     pede password ao utilizador,
     devolve um objeto private_key (RSA) pronto a usar.
     """
-    # 1) Ler o vault
-    if not VAULT_FILE.exists():
-        raise FileNotFoundError("Vault não encontrado. Corre primeiro 'activate'.")
+    from cli.core.session import load_token
+    from cli.core.api import api_get_vault
+    
+    # 1) Obter token de sessão
+    token = load_token()
+    if not token:
+        raise ValueError("Sem sessão ativa. Faz login primeiro.")
+    
+    # 2) Buscar vault do servidor
+    vault_json = api_get_vault(token)
+    if not vault_json:
+        raise FileNotFoundError("Vault não encontrado no servidor. A conta foi ativada?")
+    
+    try:
+        vault_obj = json.loads(vault_json)
+    except json.JSONDecodeError:
+        raise ValueError("Vault inválido recebido do servidor.")
 
-    with open(VAULT_FILE, "r", encoding="utf-8") as f:
-        vault_obj = json.load(f)
-
-    # 2) Pedir password ao user
+    # 3) Pedir password ao user
     password = getpass.getpass("Password do vault: ")
 
-    # 3) Desencriptar
-    private_pem = decrypt_private_key_with_password(vault_obj, password)
+    # 4) Desencriptar
+    try:
+        private_pem = decrypt_private_key_with_password(vault_obj, password)
+    except Exception as e:
+        raise ValueError(f"Falha ao desencriptar vault: {e}")
 
-    # 4) Converter PEM → objeto private_key
+    # 5) Converter PEM → objeto private_key
     private_key = load_pem_private_key(private_pem, password=None)
 
     return private_key
