@@ -3,6 +3,7 @@ import http
 from sqlmodel import Session, SQLModel
 from ..core.database import get_session
 from ..models.User import VaultContent, VaultUpdate, UserCreate, UserResponse
+from ..models.JWTRevocationToken import JWTRevocationToken
 from .service import create_user, get_all_users
 from ..auth.service import get_current_active_admin, get_current_user, check_if_admin_or_security_officer, check_if_security_officer
 from ..models.User import User
@@ -210,8 +211,24 @@ async def get_user_clearance(
     if not is_self and not is_so:
         raise HTTPException(status_code=403, detail="Not authorized")
 
+    # Get all MLS and RBAC tokens
     mls_tokens = session.exec(select(JWTMLSToken).where(JWTMLSToken.user_id == user_id)).all()
     rbac_tokens = session.exec(select(JWTRBACToken).where(JWTRBACToken.sub == str(user_id))).all()
+    
+    # Filter out revoked tokens
+    revoked_mls = session.exec(
+        select(JWTRevocationToken.token_id).where(JWTRevocationToken.token_type == "MLS")
+    ).all()
+    revoked_rbac = session.exec(
+        select(JWTRevocationToken.token_id).where(JWTRevocationToken.token_type == "RBAC")
+    ).all()
+    
+    revoked_mls_ids = set(revoked_mls)
+    revoked_rbac_ids = set(revoked_rbac)
+    
+    # Filter out revoked tokens
+    mls_tokens = [t for t in mls_tokens if t.token_id not in revoked_mls_ids]
+    rbac_tokens = [t for t in rbac_tokens if t.id not in revoked_rbac_ids]
     
     return UserClearanceResponse(mls_tokens=mls_tokens, rbac_tokens=rbac_tokens)
 

@@ -1,5 +1,6 @@
 from sqlmodel import SQLModel, Field
 from datetime import datetime
+from pydantic import field_validator
 
 class JWTRevocationToken(SQLModel, table=True):
     token_id: str = Field(primary_key=True, description="A unique identifier (JTI claim) of the original token being revoked.")
@@ -7,3 +8,10 @@ class JWTRevocationToken(SQLModel, table=True):
     revoker_id: int = Field(description="The User ID of the Security Officer who performed the revocation.")
     timestamp: datetime = Field(description="Time of revocation.")
     signature: str = Field(description="Signature by the Security Officer's private key to ensure revocation integrity.")
+
+    @field_validator('timestamp', mode='before')
+    @classmethod
+    def parse_timestamp(cls, v):
+        if isinstance(v, str):
+            return datetime.fromisoformat(v)
+        return v

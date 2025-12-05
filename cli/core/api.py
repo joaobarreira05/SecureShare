@@ -12,7 +12,7 @@ def _get_verify():
 
 def api_login(username: str, password: str) -> Optional[str]:
     """
-    Faz login no backend e devolve o access_token.
+    Logs in to the backend and returns the access_token.
     """
     url = f"{BASE_URL}/auth/login"
     data = {"username": username, "password": password}
@@ -27,7 +27,7 @@ def api_login(username: str, password: str) -> Optional[str]:
 
 def api_logout(token: str) -> bool:
     """
-    Faz logout no backend.
+    Logs out from the backend.
     """
     url = f"{BASE_URL}/auth/logout"
     headers = {"Authorization": f"Bearer {token}"}
@@ -40,7 +40,7 @@ def api_logout(token: str) -> bool:
 
 def api_activate(activation_data: dict) -> bool:
     """
-    Ativa a conta no backend.
+    Activates the account on the backend.
     """
     url = f"{BASE_URL}/auth/activate"
     try:
@@ -52,8 +52,8 @@ def api_activate(activation_data: dict) -> bool:
 
 def api_get_vault(token: str) -> Optional[str]:
     """
-    Obtém o vault (encrypted_private_key) do servidor.
-    Retorna o JSON string do vault ou None se falhar.
+    Gets the vault (encrypted_private_key) from the server.
+    Returns the vault JSON string or None if failed.
     """
     url = f"{BASE_URL}/users/me/vault"
     headers = {"Authorization": f"Bearer {token}"}
@@ -66,9 +66,24 @@ def api_get_vault(token: str) -> Optional[str]:
     except Exception:
         return None
 
+
+def api_update_vault(token: str, encrypted_private_key: str) -> bool:
+    """
+    Updates the vault (encrypted_private_key) on the server.
+    Used when changing password to re-encrypt the private key.
+    """
+    url = f"{BASE_URL}/users/me/vault"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    try:
+        resp = requests.put(url, json={"encrypted_private_key": encrypted_private_key}, headers=headers, verify=_get_verify(), timeout=10)
+        return resp.status_code in (200, 204)
+    except Exception:
+        return False
+
+
 def api_create_user(token: str, user_data: dict) -> bool:
     """
-    Cria um novo utilizador no backend (Admin only).
+    Creates a new user on the backend (Admin only).
     """
     url = f"{BASE_URL}/users"
     headers = {"Authorization": f"Bearer {token}"}
@@ -82,7 +97,7 @@ def api_create_user(token: str, user_data: dict) -> bool:
 
 def api_delete_user(token: str, user_id: int) -> bool:
     """
-    Apaga um utilizador pelo ID (Admin only).
+    Deletes a user by ID (Admin only).
     """
     url = f"{BASE_URL}/users/{user_id}"
     headers = {"Authorization": f"Bearer {token}"}
@@ -95,7 +110,7 @@ def api_delete_user(token: str, user_id: int) -> bool:
 
 def api_get_all_users(token: str, rbac_token: Optional[str] = None) -> Optional[List[dict]]:
     """
-    Obtém a lista de todos os utilizadores (Admin or Security Officer).
+    Gets the list of all users (Admin or Security Officer).
     """
     url = f"{BASE_URL}/users"
     headers = {"Authorization": f"Bearer {token}"}
@@ -112,11 +127,11 @@ def api_get_all_users(token: str, rbac_token: Optional[str] = None) -> Optional[
 
 def api_get_user_by_username(token: str, username: str, rbac_token: Optional[str] = None) -> Optional[dict]:
     """
-    Obtém o utilizador pelo username.
-    Primeiro tenta via /users/lookup (qualquer user autenticado).
-    Se falhar, tenta via lista (Admin/SO).
+    Gets the user by username.
+    First tries via /users/lookup (any authenticated user).
+    If that fails, tries via list (Admin/SO).
     """
-    # Fallback: tentar via lista (só Admin/SO)
+    # Fallback: try via list (Admin/SO only)
     users = api_get_all_users(token, rbac_token)
     if not users:
         return None
@@ -126,9 +141,26 @@ def api_get_user_by_username(token: str, username: str, rbac_token: Optional[str
     return None
 
 
+def api_revoke_token(token: str, user_id: int, token_id: str, revocation_data: dict, rbac_token: str) -> bool:
+    """
+    Revokes a token for a user (Security Officer only).
+    """
+    url = f"{BASE_URL}/users/{user_id}/revoke/{token_id}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Role-Token": rbac_token,
+        "Content-Type": "application/json"
+    }
+    try:
+        resp = requests.put(url, json=revocation_data, headers=headers, verify=_get_verify(), timeout=10)
+        return resp.status_code in (200, 204)
+    except Exception:
+        return False
+
+
 def api_get_user_public_key(token: str, user_id: int) -> Optional[str]:
     """
-    Obtém a public key de um utilizador pelo ID.
+    Gets the public key of a user by ID.
     """
     url = f"{BASE_URL}/users/{user_id}/key"
     headers = {"Authorization": f"Bearer {token}"}
@@ -141,13 +173,15 @@ def api_get_user_public_key(token: str, user_id: int) -> Optional[str]:
     except Exception:
         return None
 
-def api_get_user_clearances(token: str, user_id: int) -> Optional[dict]:
+def api_get_user_clearances(token: str, user_id: int, rbac_token: Optional[str] = None) -> Optional[dict]:
     """
-    Obtém clearances e roles do utilizador.
-    Retorna dict com mls_tokens e rbac_tokens.
+    Gets clearances and roles of the user.
+    Returns dict with mls_tokens and rbac_tokens.
     """
     url = f"{BASE_URL}/users/{user_id}/clearance"
     headers = {"Authorization": f"Bearer {token}"}
+    if rbac_token:
+        headers["X-Role-Token"] = rbac_token
     try:
         resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=10)
         if resp.status_code != 200:
@@ -158,7 +192,7 @@ def api_get_user_clearances(token: str, user_id: int) -> Optional[dict]:
 
 def api_get_my_info(token: str) -> Optional[dict]:
     """
-    Obtém informação do utilizador autenticado.
+    Gets information of the authenticated user.
     """
     url = f"{BASE_URL}/user/me/info"
     headers = {"Authorization": f"Bearer {token}"}
@@ -173,7 +207,7 @@ def api_get_my_info(token: str) -> Optional[dict]:
 
 def api_update_my_info(token: str, update_data: dict) -> bool:
     """
-    Atualiza informação do utilizador autenticado (password, email, nome).
+    Updates information of the authenticated user (password, email, name).
     """
     url = f"{BASE_URL}/user/me/info"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
@@ -196,19 +230,19 @@ def api_upload_transfer(
     justification: Optional[str] = None
 ) -> Optional[str]:
     """
-    Faz upload de uma transferência E2EE usando multipart form.
-    Retorna o transfer_id se sucesso, ou None se erro.
+    Uploads an E2EE transfer using multipart form.
+    Returns the transfer_id if successful, or None if error.
     
     Args:
-        file_path: Caminho para o ficheiro cifrado.
-        classification: Nível de classificação (TOP_SECRET, SECRET, etc.)
-        departments: Lista de departamentos.
-        recipient_keys: Lista de [{recipient_id: int, encrypted_key: str}].
-        expires_in_days: Dias até expiração.
-        mls_token: Token MLS (opcional).
-        is_public: Se é partilha pública.
-        rbac_token: Token RBAC (para Trusted Officer).
-        justification: Justificação para bypass MLS (Trusted Officer).
+        file_path: Path to the encrypted file.
+        classification: Classification level (TOP_SECRET, SECRET, etc.)
+        departments: List of departments.
+        recipient_keys: List of [{recipient_id: int, encrypted_key: str}].
+        expires_in_days: Days until expiration.
+        mls_token: MLS token (optional).
+        is_public: Whether it's a public share.
+        rbac_token: RBAC token (for Trusted Officer).
+        justification: Justification for MLS bypass (Trusted Officer).
     """
     url = f"{BASE_URL}/transfers"
     headers = {"Authorization": f"Bearer {token}"}
@@ -251,7 +285,7 @@ def api_get_transfer(
     justification: Optional[str] = None
 ) -> Optional[dict]:
     """
-    Vai buscar metadata da transferência.
+    Gets transfer metadata.
     """
     url = f"{BASE_URL}/transfers/{transfer_id}"
     headers = {"Authorization": f"Bearer {token}"}
@@ -279,7 +313,7 @@ def api_download_encrypted_file(
     justification: Optional[str] = None
 ) -> Optional[bytes]:
     """
-    Vai buscar o ficheiro cifrado bruto.
+    Gets the raw encrypted file.
     Endpoint: GET /transfers/download/{transfer_id}
     """
     url = f"{BASE_URL}/transfers/download/{transfer_id}"
@@ -300,7 +334,7 @@ def api_download_encrypted_file(
 
 def api_list_transfers(token: str, mls_token: Optional[str] = None) -> Optional[List[dict]]:
     """
-    Lista as transferências criadas pelo utilizador atual.
+    Lists transfers created by the current user.
     """
     url = f"{BASE_URL}/transfers"
     headers = {"Authorization": f"Bearer {token}"}
@@ -316,7 +350,7 @@ def api_list_transfers(token: str, mls_token: Optional[str] = None) -> Optional[
 
 def api_delete_transfer(token: str, transfer_id: str, mls_token: Optional[str] = None) -> bool:
     """
-    Apaga uma transferência (metadata + ficheiro) do servidor.
+    Deletes a transfer (metadata + file) from the server.
     """
     url = f"{BASE_URL}/transfers/{transfer_id}"
     headers = {"Authorization": f"Bearer {token}"}
@@ -336,7 +370,7 @@ def api_assign_role(
     rbac_token: Optional[str] = None
 ) -> bool:
     """
-    Atribui um role a um utilizador (Admin or SO).
+    Assigns a role to a user (Admin or SO).
     PUT /users/{user_id}/role
     
     Args:
@@ -365,7 +399,7 @@ def api_assign_clearance(
     rbac_token: str
 ) -> bool:
     """
-    Atribui uma clearance (MLS Token) a um utilizador (SO only).
+    Assigns a clearance (MLS Token) to a user (SO only).
     PUT /users/{user_id}/clearance
     
     Args:
@@ -395,7 +429,7 @@ def api_revoke_token(
     rbac_token: str
 ) -> bool:
     """
-    Revoga um token (SO only).
+    Revokes a token (SO only).
     PUT /users/{user_id}/revoke/{token_id}
     
     Args:
@@ -420,7 +454,7 @@ def api_revoke_token(
 
 def api_list_departments(token: str) -> Optional[List[dict]]:
     """
-    Lista todos os departamentos (Admin only).
+    Lists all departments (Admin only).
     """
     url = f"{BASE_URL}/departments"
     headers = {"Authorization": f"Bearer {token}"}
@@ -435,7 +469,7 @@ def api_list_departments(token: str) -> Optional[List[dict]]:
 
 def api_create_department(token: str, name: str) -> bool:
     """
-    Cria um novo departamento (Admin only).
+    Creates a new department (Admin only).
     """
     url = f"{BASE_URL}/departments"
     headers = {"Authorization": f"Bearer {token}"}
@@ -448,7 +482,7 @@ def api_create_department(token: str, name: str) -> bool:
 
 def api_delete_department(token: str, dept_id: int) -> bool:
     """
-    Apaga um departamento (Admin only).
+    Deletes a department (Admin only).
     """
     url = f"{BASE_URL}/departments/{dept_id}"
     headers = {"Authorization": f"Bearer {token}"}

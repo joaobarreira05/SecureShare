@@ -152,6 +152,8 @@ async def verify_and_store_role_token(session: Session, signed_jwt: str):
     return token_data
 
 async def verify_and_store_revocation_token(session: Session, token_data: JWTRevocationToken):
+    from datetime import datetime
+    
     # 1. Verify Issuer is Security Officer
     if token_data.token_type not in ["MLS", "RBAC"]:
         raise HTTPException(status_code=400, detail="Invalid token type. Must be 'MLS' or 'RBAC'.")
@@ -167,15 +169,27 @@ async def verify_and_store_revocation_token(session: Session, token_data: JWTRev
     )
     so_token = session.exec(statement).first()
     
-    if not so_token and not issuer_user.is_admin: # Assuming Admin can also revoke? Prompt said "Security Officer only" for this endpoint.
-        # The prompt said "check if the caller is a sec officer only, not an 'admin or sec officer'"
-        # So strict check.
+    if not so_token and not issuer_user.is_admin:
         raise HTTPException(status_code=403, detail="Only Security Officers can revoke tokens")
 
-    session.add(token_data)
+    # Convert timestamp to datetime if it's a string (SQLite needs datetime object)
+    timestamp = token_data.timestamp
+    if isinstance(timestamp, str):
+        timestamp = datetime.fromisoformat(timestamp)
+    
+    # Create a new token with proper types for SQLAlchemy
+    db_token = JWTRevocationToken(
+        token_id=token_data.token_id,
+        token_type=token_data.token_type,
+        revoker_id=token_data.revoker_id,
+        timestamp=timestamp,
+        signature=token_data.signature
+    )
+    
+    session.add(db_token)
     session.commit()
-    session.refresh(token_data)
-    return token_data
+    session.refresh(db_token)
+    return db_token
 
 async def get_all_users(session: Session):
     statement = select(User)
