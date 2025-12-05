@@ -60,6 +60,38 @@ def create_user():
         raise typer.Exit(code=1)
 
 
+@app.command("list")
+def list_users():
+    """
+    Lista todos os utilizadores (Admin ou Security Officer).
+    """
+    token = load_token()
+    if not token:
+        typer.echo("Não tens sessão ativa. Faz primeiro login.")
+        raise typer.Exit(code=1)
+
+    # Obter RBAC token se existir
+    rbac_token = load_rbac_token()
+    
+    from cli.core.api import api_get_all_users
+    users = api_get_all_users(token, rbac_token)
+    
+    if users is None:
+        typer.echo("Falha ao listar utilizadores. Verifica se tens permissões (Admin ou Security Officer).")
+        raise typer.Exit(code=1)
+
+    if not users:
+        typer.echo("Nenhum utilizador encontrado.")
+        return
+
+    typer.echo(f"\n{'ID':<5} {'Username':<20} {'Email':<30} {'Ativo':<6} {'Admin':<6}")
+    typer.echo("-" * 70)
+    for u in users:
+        active = "✅" if u.get("is_active") else "❌"
+        admin = "✅" if u.get("is_admin") else "❌"
+        typer.echo(f"{u.get('id', '-'):<5} {u.get('username', '-'):<20} {u.get('email', '-'):<30} {active:<6} {admin:<6}")
+
+
 @app.command("clearance")
 def select_clearance():
     """
@@ -103,7 +135,7 @@ def select_clearance():
             payload_json = base64.urlsafe_b64decode(payload_b64).decode("utf-8")
             payload = json.loads(payload_json)
             
-            lvl = payload.get("clearance", "N/A")
+            lvl = payload.get("level", "N/A")
             depts = payload.get("departments", [])
             exp = payload.get("exp", "N/A")
             
@@ -296,8 +328,9 @@ def assign_clearance(
         raise typer.Exit(code=1)
     issuer_id = my_info.get("id")
 
+
     # Obter info do target
-    target_user = api_get_user_by_username(token, target_username)
+    target_user = api_get_user_by_username(token, target_username, my_rbac_token)
     if not target_user:
         typer.echo(f"Utilizador '{target_username}' não encontrado.")
         raise typer.Exit(code=1)

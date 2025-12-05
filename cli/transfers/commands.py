@@ -43,8 +43,8 @@ app = typer.Typer(help="Comandos de transferência de ficheiros (upload/download
 @app.command("upload")
 def upload(
     filepath: str = typer.Argument(..., help="Caminho para o ficheiro a enviar"),
-    recipients: Optional[List[str]] = typer.Option(
-        None, "--to", "-t", help="Usernames dos destinatários (obrigatório se não for público)"
+    recipients: Optional[List[int]] = typer.Option(
+        None, "--to", "-t", help="IDs dos destinatários (obrigatório se não for público)"
     ),
     level: str = typer.Option("UNCLASSIFIED", "--level", "-l", help="Nível de segurança (TOP_SECRET, SECRET, CONFIDENTIAL, UNCLASSIFIED)"),
     departments: Optional[List[str]] = typer.Option(None, "--dept", "-d", help="Departamentos associados"),
@@ -53,18 +53,16 @@ def upload(
 ):
     """
     Upload E2EE de um ficheiro.
-    Suporta MLS (verificação de nível/departamentos) e partilhas públicas.
+    Usa --to ID para especificar destinatários ou --public para partilha pública.
     """
     token = load_token()
     if not token:
         typer.echo("Não tens sessão ativa. Faz primeiro `secureshare auth login`.")
         raise typer.Exit(code=1)
 
-    mls_token = load_mls_token()
-    
-    # Validação de argumentos
+    # Validar argumentos
     if not public and not recipients:
-        typer.echo("Tens de indicar pelo menos um destinatário com --to username (ou usar --public).")
+        typer.echo("Tens de indicar pelo menos um destinatário (--to ID) ou usar --public.")
         raise typer.Exit(code=1)
 
     path = Path(filepath)
@@ -77,6 +75,8 @@ def upload(
         typer.echo(f"Nível inválido. Opções: {', '.join(LEVEL_MAP.keys())}")
         raise typer.Exit(code=1)
 
+    mls_token = load_mls_token()
+    
     # --- MLS Checks (Client Side) ---
     if mls_token:
         try:
@@ -84,12 +84,12 @@ def upload(
             payload_b64 += "=" * (-len(payload_b64) % 4)
             payload = json.loads(base64.urlsafe_b64decode(payload_b64))
             
-            user_level = payload.get("clearance", "UNCLASSIFIED")
+            user_level = payload.get("level", "UNCLASSIFIED")
             user_depts = set(payload.get("departments", []))
             
             # No Write Down: User Level <= File Level
             if LEVEL_MAP.get(user_level, 1) > LEVEL_MAP.get(level, 1):
-                typer.echo(f"Erro MLS: Não podes fazer upload com nível {level} (o teu nível é {user_level}). Regra: User Level <= File Level.")
+                typer.echo(f"Erro MLS: Não podes fazer upload com nível {level} (o teu nível é {user_level}).")
                 raise typer.Exit(code=1)
 
             # Departments Subset
@@ -102,43 +102,35 @@ def upload(
         except typer.Exit:
             raise
         except Exception as e:
-            typer.echo(f"Aviso: Não foi possível validar regras MLS localmente ({e}). O backend fará a validação final.")
+            typer.echo(f"Aviso: Não foi possível validar regras MLS ({e}). O backend fará a validação final.")
 
     # 1) Ler ficheiro
-    file_bytes = path.read_bytes()
+    file_data = path.read_bytes()
+    filename = path.name
 
     # 2) Gerar File Key AES
     file_key = generate_file_key()
 
     # 3) Cifrar ficheiro com AES-GCM
-    nonce, encrypted_file = encrypt_file_with_aes_gcm(file_bytes, file_key)
-    
-    # Prepend nonce to encrypted file (backend should store this way or we send separately)
-    # Backend model doesn't have nonce field - it expects nonce prepended to file.
+    nonce, encrypted_file = encrypt_file_with_aes_gcm(file_data, file_key)
     encrypted_blob = nonce + encrypted_file
+
 
     # 4) Resolver recipients -> IDs e cifrar chaves
     recipient_keys: List[dict] = []
     
     if not public and recipients:
-        for username in recipients:
-            # Obter user info por username
-            user_info = api_get_user_by_username(token, username)
-            if not user_info:
-                typer.echo(f"Utilizador '{username}' não encontrado.")
-                raise typer.Exit(code=1)
-            
-            user_id = user_info.get("id")
-            if not user_id:
-                typer.echo(f"Falha ao obter ID do utilizador '{username}'.")
-                raise typer.Exit(code=1)
-
-            # Obter public key
+        for user_id in recipients:
+            # Obter public key diretamente pelo ID
             pubkey_pem = api_get_user_public_key(token, user_id)
             if not pubkey_pem:
-                typer.echo(f"Falha ao obter a chave pública de '{username}'.")
+                typer.echo(f"Falha ao obter a chave pública do utilizador ID {user_id}.")
                 raise typer.Exit(code=1)
 
+            # Converter para bytes se necessário
+            if isinstance(pubkey_pem, str):
+                pubkey_pem = pubkey_pem.encode("utf-8")
+            
             encrypted_key_bytes = encrypt_file_key_for_user(file_key, pubkey_pem)
             
             recipient_keys.append({

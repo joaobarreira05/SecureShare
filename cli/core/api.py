@@ -79,12 +79,14 @@ def api_create_user(token: str, user_data: dict) -> bool:
     except Exception:
         return False
 
-def api_get_all_users(token: str) -> Optional[List[dict]]:
+def api_get_all_users(token: str, rbac_token: Optional[str] = None) -> Optional[List[dict]]:
     """
     Obtém a lista de todos os utilizadores (Admin or Security Officer).
     """
     url = f"{BASE_URL}/users"
     headers = {"Authorization": f"Bearer {token}"}
+    if rbac_token:
+        headers["X-Role-Token"] = rbac_token
     try:
         resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=10)
         if resp.status_code != 200:
@@ -93,17 +95,43 @@ def api_get_all_users(token: str) -> Optional[List[dict]]:
     except Exception:
         return None
 
-def api_get_user_by_username(token: str, username: str) -> Optional[dict]:
+
+def api_get_user_by_username(token: str, username: str, rbac_token: Optional[str] = None) -> Optional[dict]:
     """
-    Obtém o utilizador pelo username (pesquisa na lista).
+    Obtém o utilizador pelo username.
+    Primeiro tenta via /users/lookup (qualquer user autenticado).
+    Se falhar, tenta via lista (Admin/SO).
     """
-    users = api_get_all_users(token)
+    # Tentar lookup direto (funciona para qualquer user autenticado)
+    user = api_lookup_user(token, username)
+    if user:
+        return user
+    
+    # Fallback: tentar via lista (só Admin/SO)
+    users = api_get_all_users(token, rbac_token)
     if not users:
         return None
-    for user in users:
-        if user.get("username") == username:
-            return user
+    for u in users:
+        if u.get("username") == username:
+            return u
     return None
+
+
+def api_lookup_user(token: str, username: str) -> Optional[dict]:
+    """
+    Lookup user by username via /users/lookup/{username}.
+    Funciona para qualquer utilizador autenticado.
+    """
+    url = f"{BASE_URL}/users/lookup/{username}"
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=5)
+        if resp.status_code != 200:
+            return None
+        return resp.json()
+    except Exception:
+        return None
+
 
 def api_get_user_public_key(token: str, user_id: int) -> Optional[str]:
     """
@@ -139,7 +167,7 @@ def api_get_my_info(token: str) -> Optional[dict]:
     """
     Obtém informação do utilizador autenticado.
     """
-    url = f"{BASE_URL}/user/me/info"
+    url = f"{BASE_URL}/users/me"
     headers = {"Authorization": f"Bearer {token}"}
     try:
         resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=5)
