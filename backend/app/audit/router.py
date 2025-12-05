@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 from typing import List
-from app.core.database import get_session
-from app.auth.service import check_if_auditor
-from app.models.User import User
-from app.models.Audit import AuditLog, AuditValidationRequest
-from app.audit.service import add_log_signature
+from ..core.database import get_session
+from ..auth.service import check_if_auditor
+from ..models.User import User
+from ..models.Audit import AuditLog, AuditValidationRequest
+from .service import add_log_signature
 
 router = APIRouter(
     prefix="/audit",

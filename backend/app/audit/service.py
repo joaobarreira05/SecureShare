@@ -1,5 +1,5 @@
 from sqlmodel import Session, select
-from app.models.Audit import AuditLog
+from ..models.Audit import AuditLog
 from datetime import datetime, timezone
 from typing import Optional
 
