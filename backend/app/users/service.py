@@ -102,18 +102,17 @@ async def verify_and_store_role_token(session: Session, signed_jwt: str):
         raise HTTPException(status_code=403, detail="Issuer does not have authority to assign roles")
 
     target_role = app_role
-    
     # Admin -> Security Officer
     if target_role == Role.SECURITY_OFFICER and issuer_role != Role.ADMINISTRATOR:
          raise HTTPException(status_code=403, detail="Only Administrators can appoint Security Officers")
     
     # Admin/SO -> Trusted Officer
-    if target_role == Role.TRUSTED_OFFICER and issuer_role not in [Role.ADMINISTRATOR, Role.SECURITY_OFFICER]:
+    if target_role == Role.TRUSTED_OFFICER and issuer_role not in [Role.SECURITY_OFFICER]:
         raise HTTPException(status_code=403, detail="Only Administrators or Security Officers can appoint Trusted Officers")
 
     # Admin/SO -> Auditor
-    if target_role == Role.AUDITOR and issuer_role not in [Role.ADMINISTRATOR, Role.SECURITY_OFFICER]:
-        raise HTTPException(status_code=403, detail="Only Administrators or Security Officers can appoint Auditors")
+    if target_role == Role.AUDITOR and issuer_role not in [Role.ADMINISTRATOR]:
+        raise HTTPException(status_code=403, detail="Only Administrators can appoint Auditors")
 
     # 7. Store Token
     token_data = JWTRBACToken(
@@ -184,7 +183,8 @@ async def verify_and_store_mls_token(session: Session, signed_jwt: str):
     issuer = session.get(User, int(issuer_id))
     if not issuer or not issuer.public_key:
         raise HTTPException(status_code=400, detail="Issuer not found or missing public key")
-
+    if issuer_id == int(sub):
+        raise HTTPException(status_code=400, detail="A security officer cannot issue a token for himself")
     # 4. Verify Signature
     try:
         # Verify using the issuer's public key
