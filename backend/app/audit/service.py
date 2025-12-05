@@ -35,13 +35,17 @@ def log_event(db: Session, actor_id: int, action: str, details: Optional[str] = 
     
     return new_log
 
-def add_log_signature(db: Session, log_id: int, signature: str) -> Optional[AuditLog]:
+def create_validation_entry(db: Session, auditor_id: int, log_id: int, signature: str) -> AuditLog:
+    """
+    Creates a new audit log entry to record the validation of a previous entry.
+    """
+    # Verify the log entry exists
     log_entry = db.get(AuditLog, log_id)
     if not log_entry:
         return None
+
+    # Create a new log entry for the validation event
+    # We store the signature of the validated entry in the details
+    details = f"Validated Log ID: {log_id}. Signature: {signature}"
     
-    log_entry.signature = signature
-    db.add(log_entry)
-    db.commit()
-    db.refresh(log_entry)
-    return log_entry
+    return log_event(db, auditor_id, "LOG_VALIDATION", details)

@@ -27,7 +27,10 @@ def validate_audit_log_entry(
     current_auditor: User = Depends(check_if_auditor),
     db: Session = Depends(get_session)
 ):
-    updated_log = add_log_signature(db, request.log_id, request.signature)
-    if not updated_log:
+    # We pass the current_auditor.id as the actor_id for the new log entry
+    validation_log = create_validation_entry(db, current_auditor.id, request.log_id, request.signature)
+    
+    if not validation_log:
         raise HTTPException(status_code=404, detail="Log entry not found")
-    return updated_log
+        
+    return validation_log

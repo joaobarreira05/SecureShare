@@ -128,8 +128,8 @@ def list_users():
     typer.echo(f"\n{'ID':<5} {'Username':<20} {'Email':<30} {'Ativo':<6} {'Admin':<6}")
     typer.echo("-" * 70)
     for u in users:
-        active = "✅" if u.get("is_active") else "❌"
-        admin = "✅" if u.get("is_admin") else "❌"
+        active = "🗸" if u.get("is_active") else "☓"
+        admin = "🗸" if u.get("is_admin") else "☓"
         typer.echo(f"{u.get('id', '-'):<5} {u.get('username', '-'):<20} {u.get('email', '-'):<30} {active:<6} {admin:<6}")
 
 
@@ -349,7 +349,7 @@ def assign_role(
 
     # Enviar para backend
     if api_assign_role(token, subject_id, signed_jwt, my_rbac_token):
-        typer.echo(f"Role '{role}' atribuído a '{target_username}' com sucesso! ✅")
+        typer.echo(f"Role '{role}' atribuído a '{target_username}' com sucesso! 🗸")
     else:
         typer.echo("Falha ao atribuir role. Verifica se tens permissões (Admin ou Security Officer).")
         raise typer.Exit(code=1)
@@ -432,7 +432,7 @@ def assign_clearance(
     # Send to backend
     if api_assign_clearance(token, subject_id, signed_jwt, my_rbac_token):
         dept_str = ", ".join(departments) if departments else "(none)"
-        typer.echo(f"Clearance '{level}' assigned to '{target_username}' successfully! ✅")
+        typer.echo(f"Clearance '{level}' assigned to '{target_username}' successfully! 🗸")
         typer.echo(f"Departments: {dept_str}")
     else:
         typer.echo("Failed to assign clearance. Check if you have Security Officer permissions.")

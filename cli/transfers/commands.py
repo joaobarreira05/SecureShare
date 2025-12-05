@@ -300,7 +300,7 @@ def download(
         raise typer.Exit(code=1)
 
     out_path.write_bytes(plaintext)
-    typer.echo(f"File saved to: {out_path} ✅")
+    typer.echo(f"File saved to: {out_path} 🗸")
 
 
 @app.command("list")

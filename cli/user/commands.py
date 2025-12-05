@@ -29,8 +29,8 @@ def me():
     typer.echo(f"   Username: {info.get('username', '-')}")
     typer.echo(f"   Email:    {info.get('email', '-')}")
     typer.echo(f"   Name:     {info.get('full_name', '-')}")
-    typer.echo(f"   Active:   {'✅' if info.get('is_active') else '❌'}")
-    typer.echo(f"   Admin:    {'✅' if info.get('is_admin') else '❌'}")
+    typer.echo(f"   Active:   {'🗸' if info.get('is_active') else '☓'}")
+    typer.echo(f"   Admin:    {'🗸' if info.get('is_admin') else '☓'}")
 
 
 @app.command("update-password")
@@ -121,7 +121,7 @@ def update_info(
         update_data["full_name"] = name
 
     if api_update_my_info(token, update_data):
-        typer.echo("Info updated successfully! ✅")
+        typer.echo("Info updated successfully! 🗸")
     else:
         typer.echo("Failed to update info.")
         raise typer.Exit(code=1)

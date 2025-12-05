@@ -490,4 +490,52 @@ def api_delete_department(token: str, dept_id: int) -> bool:
         resp = requests.delete(url, headers=headers, verify=_get_verify(), timeout=10)
         return resp.status_code == 204
     except Exception:
+    except Exception:
         return False
+
+
+def api_get_audit_logs(token: str, rbac_token: str) -> Optional[List[dict]]:
+    """
+    Gets the audit logs (Auditor only).
+    GET /audit/log
+    """
+    url = f"{BASE_URL}/audit/log"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Role-Token": rbac_token
+    }
+    try:
+        resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=10)
+        if resp.status_code != 200:
+            return None
+        return resp.json()
+    except Exception:
+        return None
+
+
+def api_validate_audit_log(
+    token: str,
+    log_id: int,
+    signature: str,
+    rbac_token: str
+) -> Optional[dict]:
+    """
+    Validates an audit log entry (Auditor only).
+    PUT /audit/validate
+    """
+    url = f"{BASE_URL}/audit/validate"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Role-Token": rbac_token
+    }
+    data = {
+        "log_id": log_id,
+        "signature": signature
+    }
+    try:
+        resp = requests.put(url, json=data, headers=headers, verify=_get_verify(), timeout=10)
+        if resp.status_code != 200:
+            return None
+        return resp.json()
+    except Exception:
+        return None
