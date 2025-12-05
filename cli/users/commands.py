@@ -246,9 +246,36 @@ def assign_role(
         raise typer.Exit(code=1)
     
     issuer_id = my_info.get("id")
+    is_admin = my_info.get("is_admin", False)
+
+    # Obter meu RBAC token (se existir)
+    my_rbac_token = load_rbac_token()
+    is_security_officer = False
+    
+    if my_rbac_token:
+        rbac_payload = decode_rbac_token(my_rbac_token)
+        if rbac_payload and rbac_payload.get("app_role") == "SECURITY_OFFICER":
+            is_security_officer = True
+
+    # Verificar permissões de atribuição de roles
+    # Admin → SECURITY_OFFICER, AUDITOR (NÃO pode dar TRUSTED_OFFICER)
+    # Security Officer → TRUSTED_OFFICER
+    if role == "TRUSTED_OFFICER":
+        if not is_security_officer:
+            typer.echo("Apenas Security Officers podem atribuir o role TRUSTED_OFFICER.")
+            raise typer.Exit(code=1)
+    elif role in ["SECURITY_OFFICER", "AUDITOR"]:
+        if not is_admin:
+            typer.echo(f"Apenas Administradores podem atribuir o role {role}.")
+            raise typer.Exit(code=1)
+    else:
+        # Outros roles (se existirem)
+        if not is_admin and not is_security_officer:
+            typer.echo("Não tens permissões para atribuir roles.")
+            raise typer.Exit(code=1)
 
     # Obter info do alvo
-    target_user = api_get_user_by_username(token, target_username)
+    target_user = api_get_user_by_username(token, target_username, my_rbac_token)
     if not target_user:
         typer.echo(f"Utilizador '{target_username}' não encontrado.")
         raise typer.Exit(code=1)
@@ -277,8 +304,7 @@ def assign_role(
         typer.echo(f"Falha ao criar token: {e}")
         raise typer.Exit(code=1)
 
-    # Carregar meu RBAC token (se não for admin)
-    my_rbac_token = load_rbac_token()
+    # Enviar para backend
 
     # Enviar para backend
     if api_assign_role(token, subject_id, signed_jwt, my_rbac_token):
@@ -335,6 +361,11 @@ def assign_clearance(
         typer.echo(f"Utilizador '{target_username}' não encontrado.")
         raise typer.Exit(code=1)
     subject_id = target_user.get("id")
+
+    # Verificar auto-atribuição: SO não pode dar clearance a si próprio
+    if subject_id == issuer_id:
+        typer.echo("Não podes atribuir clearance a ti próprio. Pede a outro Security Officer.")
+        raise typer.Exit(code=1)
 
     # Carregar private key
     typer.echo("A carregar chave privada...")

@@ -185,7 +185,9 @@ def api_upload_transfer(
     recipient_keys: List[dict],
     expires_in_days: int = 7,
     mls_token: Optional[str] = None,
-    is_public: bool = False
+    is_public: bool = False,
+    rbac_token: Optional[str] = None,
+    justification: Optional[str] = None
 ) -> Optional[str]:
     """
     Faz upload de uma transferência E2EE usando multipart form.
@@ -199,11 +201,17 @@ def api_upload_transfer(
         expires_in_days: Dias até expiração.
         mls_token: Token MLS (opcional).
         is_public: Se é partilha pública.
+        rbac_token: Token RBAC (para Trusted Officer).
+        justification: Justificação para bypass MLS (Trusted Officer).
     """
     url = f"{BASE_URL}/transfers"
     headers = {"Authorization": f"Bearer {token}"}
     if mls_token:
         headers["X-MLS-Token"] = mls_token
+    if rbac_token:
+        headers["X-Role-Token"] = rbac_token
+    if justification:
+        headers["X-Justification"] = justification
 
     try:
         with open(file_path, "rb") as f:
@@ -223,11 +231,19 @@ def api_upload_transfer(
                 return str(result.get("transfer_id"))
             except:
                 return None
+        print(f"DEBUG: Upload failed: {resp.status_code} - {resp.text}")
         return None
-    except Exception:
+    except Exception as e:
+        print(f"DEBUG: Upload exception: {e}")
         return None
 
-def api_get_transfer(token: str, transfer_id: str, mls_token: Optional[str] = None) -> Optional[dict]:
+def api_get_transfer(
+    token: str, 
+    transfer_id: str, 
+    mls_token: Optional[str] = None,
+    rbac_token: Optional[str] = None,
+    justification: Optional[str] = None
+) -> Optional[dict]:
     """
     Vai buscar metadata da transferência.
     """
@@ -235,6 +251,10 @@ def api_get_transfer(token: str, transfer_id: str, mls_token: Optional[str] = No
     headers = {"Authorization": f"Bearer {token}"}
     if mls_token:
         headers["X-MLS-Token"] = mls_token
+    if rbac_token:
+        headers["X-Role-Token"] = rbac_token
+    if justification:
+        headers["X-Justification"] = justification
     try:
         resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=10)
         if resp.status_code != 200:
@@ -245,7 +265,13 @@ def api_get_transfer(token: str, transfer_id: str, mls_token: Optional[str] = No
         print(f"DEBUG: Transfer GET exception: {e}")
         return None
 
-def api_download_encrypted_file(token: str, transfer_id: str, mls_token: Optional[str] = None) -> Optional[bytes]:
+def api_download_encrypted_file(
+    token: str, 
+    transfer_id: str, 
+    mls_token: Optional[str] = None,
+    rbac_token: Optional[str] = None,
+    justification: Optional[str] = None
+) -> Optional[bytes]:
     """
     Vai buscar o ficheiro cifrado bruto.
     Endpoint: GET /transfers/download/{transfer_id}
@@ -254,6 +280,10 @@ def api_download_encrypted_file(token: str, transfer_id: str, mls_token: Optiona
     headers = {"Authorization": f"Bearer {token}"}
     if mls_token:
         headers["X-MLS-Token"] = mls_token
+    if rbac_token:
+        headers["X-Role-Token"] = rbac_token
+    if justification:
+        headers["X-Justification"] = justification
     try:
         resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=30)
         if resp.status_code != 200:
