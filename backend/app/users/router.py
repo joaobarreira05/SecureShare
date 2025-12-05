@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+import http
 from sqlmodel import Session, SQLModel
 from ..core.database import get_session
 from ..models.User import VaultContent, VaultUpdate, UserCreate, UserResponse
@@ -19,6 +20,8 @@ async def create_new_user(
     Create a new user (Admin only).
     """
     await create_user(session, user)
+    action = f"POST /users {status.HTTP_201_CREATED} {http.HTTPStatus(status.HTTP_201_CREATED).phrase}"
+    log_event(session, current_admin.id, action, "User created successfully")
     return {"message": "Created new user Successfully"}
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -31,6 +34,8 @@ async def delete_user_endpoint(
     Delete a user (Admin only).
     """
     await delete_user(session, user_id)
+    action = f"DELETE /users/{user_id} {status.HTTP_204_NO_CONTENT} {http.HTTPStatus(status.HTTP_204_NO_CONTENT).phrase}"
+    log_event(session, current_admin.id, action, "User deleted successfully")
     return None
 
 @router.get("", response_model=list[UserResponse])
@@ -41,6 +46,8 @@ async def read_users(
     """
     List all users (Admin or Security Officer).
     """
+    action = f"GET /users {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
+    log_event(session, current_user.id, action, "Users listed successfully")
     return await get_all_users(session)
 
 @router.get("/me/vault", response_model=VaultContent)
@@ -48,6 +55,8 @@ async def get_user_vault(current_user: User = Depends(get_current_user)):
     """
     Retrieve the current user's encrypted private key blob.
     """
+    action = f"GET /users/me/vault {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
+    log_event(session, current_user.id, action, "User vault retrieved successfully")
     return VaultContent(encrypted_private_key=current_user.encrypted_private_key)
 
 @router.put("/me/vault", status_code=status.HTTP_204_NO_CONTENT)
@@ -59,6 +68,8 @@ async def update_user_vault(
     """
     Upload or update the current user's encrypted private key blob.
     """
+    action = f"PUT /users/me/vault {status.HTTP_204_NO_CONTENT} {http.HTTPStatus(status.HTTP_204_NO_CONTENT).phrase}"
+    log_event(session, current_user.id, action, "User vault updated successfully")
     await update_vault(session, current_user, vault)
     return None
 
@@ -85,10 +96,14 @@ async def update_user_role(
     
     # Verify the token is for the correct user
     if token.sub != str(user_id):
+        action = f"PUT /users/{user_id}/role {status.HTTP_400_BAD_REQUEST} - Token subject does not match user ID"
+        log_event(session, current_user.id, action)
         raise HTTPException(status_code=400, detail="Token subject does not match user ID")
     
     # Verify the token was issued by the caller
     if token.iss != str(current_user.id):
+        action = f"PUT /users/{user_id}/role {status.HTTP_400_BAD_REQUEST} - Token issuer does not match caller ID"
+        log_event(session, current_user.id, action)
         raise HTTPException(status_code=400, detail="Token issuer does not match caller ID")
 
     return None
@@ -114,13 +129,19 @@ async def revoke_token(
     # For now, we focus on storing the revocation token.
     
     if token.token_id != token_id:
-         raise HTTPException(status_code=400, detail="Token ID in body does not match URL")
+        action = f"PUT /users/{user_id}/revoke/{token_id} {status.HTTP_400_BAD_REQUEST} - Token ID in body does not match URL"
+        log_event(session, current_so.id, action)
+        raise HTTPException(status_code=400, detail="Token ID in body does not match URL")
 
     # Verify the token was issued by the caller
     if token.revoker_id != current_so.id:
+        action = f"PUT /users/{user_id}/revoke/{token_id} {status.HTTP_400_BAD_REQUEST} - Token revoker does not match caller ID"
+        log_event(session, current_so.id, action)
         raise HTTPException(status_code=400, detail="Token revoker does not match caller ID")
 
     await verify_and_store_revocation_token(session, token)
+    action = f"PUT /users/{user_id}/revoke/{token_id} {status.HTTP_204_NO_CONTENT} - {http.HTTPStatus(status.HTTP_204_NO_CONTENT).phrase}"
+    log_event(session, current_so.id, action)
     return None
 
 @router.get("/{user_id}/key", response_model=dict)
@@ -134,11 +155,17 @@ async def get_user_public_key(
     """
     user = session.get(User, user_id)
     if not user:
+        action = f"GET /users/{user_id}/key {status.HTTP_404_NOT_FOUND} - User not found"
+        log_event(session, current_user.id, action)
         raise HTTPException(status_code=404, detail="User not found")
     
     if not user.public_key:
+        action = f"GET /users/{user_id}/key {status.HTTP_404_NOT_FOUND} - Public key not found for this user"
+        log_event(session, current_user.id, action)
         raise HTTPException(status_code=404, detail="Public key not found for this user")
 
+    action = f"GET /users/{user_id}/key {status.HTTP_200_OK} - {http.HTTPStatus(status.HTTP_200_OK).phrase}"
+    log_event(session, current_user.id, action)
     return {"public_key": user.public_key}
 
 from ..models.JWTMLSToken import JWTMLSToken

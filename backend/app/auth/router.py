@@ -1,4 +1,5 @@
 from datetime import timedelta
+import http
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
@@ -7,6 +8,7 @@ from ..core.settings import settings
 from ..models.User import UserResponse, LoginRequest, UserActivate, User
 from ..models.JWTAuthToken import Token
 from .service import authenticate_user, create_access_token, get_current_user, activate_user_account
+from ..audit.service import log_event
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -15,7 +17,10 @@ async def activate_account(activation_data: UserActivate, session: Session = Dep
     """
     Activate a new user account using OTP and set password/keys.
     """
-    await activate_user_account(session, activation_data)
+    user = await activate_user_account(session, activation_data)
+
+    action = f"POST /activate {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
+    log_event(session, user.id, action, "Account activated successfully")
     return {"message": "Account activated successfully"}
 
 @router.post("/login", response_model=Token)
@@ -24,12 +29,16 @@ async def login(login_data: LoginRequest, session: Session = Depends(get_session
     Login with username and password to get an access token.
     """
     user = await authenticate_user(session, login_data.username, login_data.password)
+
     if not user:
+        action = f"POST /login {status.HTTP_401_UNAUTHORIZED} - {http.HTTPStatus(status.HTTP_401_UNAUTHORIZED).phrase}"
+        log_event(session, user.id, action, "Incorrect username or password")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         session=session,
@@ -37,6 +46,8 @@ async def login(login_data: LoginRequest, session: Session = Depends(get_session
         data={"sub": user.username, "scopes": ["admin"] if user.is_admin else []},
         expires_delta=access_token_expires
     )
+    action = f"POST /login {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
+    log_event(session, user.id, action, "Login successful")
     return Token(access_token=access_token, token_type="bearer")
 
 
@@ -45,4 +56,6 @@ async def logout(current_user: Annotated[User, Depends(get_current_user)]):
     """
     Logout the current user.
     """
+    action = f"POST /logout {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
+    log_event(session, user.id, action, "Logged out successfully")
     return {"message": "Logged out successfully"}

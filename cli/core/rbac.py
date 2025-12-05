@@ -76,7 +76,10 @@ def sign_rbac_token(payload: dict, private_key_pem: bytes) -> str:
     private_key = load_pem_private_key(private_key_pem, password=None)
     
     # Create header
-    header = {"alg": "RS256", "typ": "JWT"}
+    # We include 'kid' (Key ID) which corresponds to the issuer_id
+    # This allows the backend to find the public key without peeking at the payload
+    issuer_id = payload.get("iss")
+    header = {"alg": "RS256", "typ": "JWT", "kid": str(issuer_id)}
     
     # Encode header and payload
     header_b64 = _base64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8"))

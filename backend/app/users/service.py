@@ -71,32 +71,35 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 async def verify_and_store_role_token(session: Session, signed_jwt: str):
-    # 1. Decode without verification to get headers and payload
+    # 1. Get Issuer ID from Header
     try:
-        payload = jwt.get_unverified_claims(signed_jwt)
+        header = jwt.get_unverified_header(signed_jwt)
+        issuer_id = header.get("kid")
     except JWTError:
         raise HTTPException(status_code=400, detail="Invalid JWT format")
 
-    # 2. Extract Claims
-    issuer_id = payload.get("iss")
+    if not issuer_id:
+        raise HTTPException(status_code=400, detail="Missing 'kid' in JWT header")
+
+    # 2. Fetch Issuer Public Key
+    issuer_user = session.get(User, int(issuer_id))
+    if not issuer_user or not issuer_user.public_key:
+        raise HTTPException(status_code=400, detail="Issuer not found or has no public key")
+
+    # 3. Verify Signature & Decode
+    try:
+        payload = jwt.decode(signed_jwt, issuer_user.public_key, algorithms=["RS256"])
+    except JWTError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid signature: {str(e)}")
+
+    # 4. Extract & Verify Claims (from VERIFIED payload)
     exp = payload.get("exp")
     sub = payload.get("sub")
     app_role = payload.get("app_role")
     jti = payload.get("jti")
 
-    if not issuer_id or not exp or not sub or not app_role or not jti:
-        raise HTTPException(status_code=400, detail="Missing required claims (iss, exp, sub, app_role, jti)")
-
-    # 3. Fetch Issuer Public Key
-    issuer_user = session.get(User, int(issuer_id))
-    if not issuer_user or not issuer_user.public_key:
-        raise HTTPException(status_code=400, detail="Issuer not found or has no public key")
-
-    # 4. Verify Signature
-    try:
-        jwt.decode(signed_jwt, issuer_user.public_key, algorithms=["RS256"])
-    except JWTError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid signature: {str(e)}")
+    if not exp or not sub or not app_role or not jti:
+        raise HTTPException(status_code=400, detail="Missing required claims (exp, sub, app_role, jti)")
 
     # 5. Check Revocation
     revoked = session.get(JWTRevocationToken, (jti, "RBAC"))
@@ -121,18 +124,17 @@ async def verify_and_store_role_token(session: Session, signed_jwt: str):
         raise HTTPException(status_code=403, detail="Issuer does not have authority to assign roles")
 
     target_role = app_role
-    
     # Admin -> Security Officer
     if target_role == Role.SECURITY_OFFICER and issuer_role != Role.ADMINISTRATOR:
          raise HTTPException(status_code=403, detail="Only Administrators can appoint Security Officers")
     
     # Admin/SO -> Trusted Officer
-    if target_role == Role.TRUSTED_OFFICER and issuer_role not in [Role.ADMINISTRATOR, Role.SECURITY_OFFICER]:
+    if target_role == Role.TRUSTED_OFFICER and issuer_role not in [Role.SECURITY_OFFICER]:
         raise HTTPException(status_code=403, detail="Only Administrators or Security Officers can appoint Trusted Officers")
 
     # Admin/SO -> Auditor
-    if target_role == Role.AUDITOR and issuer_role not in [Role.ADMINISTRATOR, Role.SECURITY_OFFICER]:
-        raise HTTPException(status_code=403, detail="Only Administrators or Security Officers can appoint Auditors")
+    if target_role == Role.AUDITOR and issuer_role not in [Role.ADMINISTRATOR]:
+        raise HTTPException(status_code=403, detail="Only Administrators can appoint Auditors")
 
     # 7. Store Token
     token_data = JWTRBACToken(
@@ -197,35 +199,37 @@ from ..models.JWTMLSToken import JWTMLSToken
 from datetime import datetime
 
 async def verify_and_store_mls_token(session: Session, signed_jwt: str):
-    # 1. Decode without verification to get headers and payload (for iss and exp)
+    # 1. Get Issuer ID from Header
     try:
-        # We use options={"verify_signature": False} to peek at the payload
-        payload = jwt.get_unverified_claims(signed_jwt)
+        header = jwt.get_unverified_header(signed_jwt)
+        issuer_id = header.get("kid")
     except JWTError:
         raise HTTPException(status_code=400, detail="Invalid JWT format")
 
-    # 2. Extract Issuer and Expiration
-    issuer_id = payload.get("iss")
-    exp = payload.get("exp")
-    sub = payload.get("sub")
-    jti = payload.get("jti")
+    if not issuer_id:
+        raise HTTPException(status_code=400, detail="Missing 'kid' in JWT header")
 
-    if not issuer_id or not exp or not sub or not jti:
-        raise HTTPException(status_code=400, detail="Missing required claims (iss, exp, sub, jti)")
-
-    # 3. Fetch Issuer Public Key
+    # 2. Fetch Issuer Public Key
     issuer = session.get(User, int(issuer_id))
     if not issuer or not issuer.public_key:
         raise HTTPException(status_code=400, detail="Issuer not found or missing public key")
 
-    # 4. Verify Signature
+    # 3. Verify Signature & Decode
     try:
-        # Verify using the issuer's public key
-        # We need to construct the public key object or pass the PEM string if supported
-        # jose.jwt.decode supports PEM string for public keys
-        jwt.decode(signed_jwt, issuer.public_key, algorithms=["RS256"])
+        payload = jwt.decode(signed_jwt, issuer.public_key, algorithms=["RS256"])
     except JWTError as e:
         raise HTTPException(status_code=400, detail=f"Invalid signature: {str(e)}")
+
+    # 4. Extract & Verify Claims (from VERIFIED payload)
+    exp = payload.get("exp")
+    sub = payload.get("sub")
+    jti = payload.get("jti")
+
+    if not exp or not sub or not jti:
+        raise HTTPException(status_code=400, detail="Missing required claims (exp, sub, jti)")
+
+    if issuer_id == int(sub):
+        raise HTTPException(status_code=400, detail="A security officer cannot issue a token for himself")
 
     # 5. Check Revocation
     revoked = session.get(JWTRevocationToken, (jti, "MLS"))

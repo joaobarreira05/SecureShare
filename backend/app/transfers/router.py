@@ -1,4 +1,5 @@
 from uuid import UUID
+import http
 from typing import Optional
 
 from fastapi import APIRouter, Depends, UploadFile, File, Form, status, Header
@@ -40,6 +41,11 @@ async def create_transfer(
         justification=x_justification,
         is_trusted_officer=is_trusted_officer
     )
+    action = f"POST /transfers {status.HTTP_201_CREATED} - {http.HTTPStatus(status.HTTP_201_CREATED).phrase}"
+    if is_trusted_officer:
+        log_event(session, current_user.id, action, "Trusted officer: {x_justification}")
+    else:
+        log_event(session, current_user.id, action, "Transfer created successfully")
     return {"transfer_id": transfer_id}
 
 @router.get("/{transfer_id}")
@@ -51,6 +57,12 @@ async def get_transfer_metadata(
     is_trusted_officer: bool = Depends(check_if_trusted_officer_or_none),
     db: Session = Depends(get_session)
 ):
+    action = f"GET /transfers/{transfer_id} {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
+    if is_trusted_officer:
+        log_event(session, current_user.id, action, "Trusted officer: {x_justification}")
+    else:
+        log_event(session, current_user.id, action, "Transfer metadata retrieved successfully")
+
     return service.get_transfer_metadata_service(
         db, 
         current_user, 
@@ -69,6 +81,11 @@ async def download_encrypted_blob(
     is_trusted_officer: bool = Depends(check_if_trusted_officer_or_none),
     db: Session = Depends(get_session)
 ):
+    action = f"GET /transfers/download/{transfer_id} {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
+    if is_trusted_officer:
+        log_event(session, current_user.id, action, "Trusted officer: {x_justification}")
+    else:
+        log_event(session, current_user.id, action, "Transfer downloaded successfully")
     iterfile = service.get_transfer_file_stream_service(
         db, 
         current_user, 
@@ -84,6 +101,8 @@ async def list_user_transfers(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session)
 ):
+    action = f"GET /transfers {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
+    log_event(session, current_user.id, action, "Transfers listed successfully")
     return service.list_user_transfers_service(db, current_user)
 
 @router.delete("/{transfer_id}")
@@ -93,4 +112,6 @@ async def delete_transfer(
     db: Session = Depends(get_session)
 ):
     service.delete_transfer_service(db, current_user, transfer_id)
+    action = f"DELETE /transfers/{transfer_id} {status.HTTP_204_NO_CONTENT} {http.HTTPStatus(status.HTTP_204_NO_CONTENT).phrase}"
+    log_event(session, current_user.id, action, "Transfer deleted successfully")
     return {"detail": "Transfer deleted"}

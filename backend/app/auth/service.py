@@ -140,39 +140,42 @@ from cryptography.exceptions import InvalidSignature
 import base64
 
 def verify_rbac_token_signature(session: Session, signed_jwt: str):
-    # 1. Decode without verification to get headers and payload
+    # 1. Get Issuer ID from Header (safe to read before verification)
     try:
-        payload = jwt.get_unverified_claims(signed_jwt)
+        header = jwt.get_unverified_header(signed_jwt)
+        issuer_id = header.get("kid")
     except JWTError:
         raise HTTPException(status_code=400, detail="Invalid JWT format")
 
-    # 2. Extract Claims
-    issuer_id = payload.get("iss")
-    exp = payload.get("exp")
-    jti = payload.get("jti")
+    if not issuer_id:
+        raise HTTPException(status_code=400, detail="Missing 'kid' in JWT header")
 
-    if not issuer_id or not exp or not jti:
-        raise HTTPException(status_code=400, detail="Missing required claims (iss, exp, jti)")
-
-    # 3. Check Expiration
-    if exp < datetime.utcnow().timestamp():
-        raise HTTPException(status_code=400, detail="Token has expired")
-
-    # 4. Check Revocation
-    revoked = session.get(JWTRevocationToken, (jti, "RBAC"))
-    if revoked:
-         raise HTTPException(status_code=403, detail="Token has been revoked")
-
-    # 5. Fetch Issuer Public Key
+    # 2. Fetch Issuer Public Key
     issuer = session.get(User, int(issuer_id))
     if not issuer or not issuer.public_key:
         raise HTTPException(status_code=400, detail="Issuer not found or missing public key")
 
-    # 6. Verify Signature
+    # 3. Verify Signature & Decode
     try:
-        jwt.decode(signed_jwt, issuer.public_key, algorithms=["RS256"])
+        payload = jwt.decode(signed_jwt, issuer.public_key, algorithms=["RS256"])
     except JWTError as e:
         raise HTTPException(status_code=400, detail=f"Invalid signature: {str(e)}")
+
+    # 4. Extract & Verify Claims (from VERIFIED payload)
+    exp = payload.get("exp")
+    jti = payload.get("jti")
+
+    if not exp or not jti:
+        raise HTTPException(status_code=400, detail="Missing required claims (exp, jti)")
+
+    # 5. Check Expiration
+    if exp < datetime.utcnow().timestamp():
+        raise HTTPException(status_code=400, detail="Token has expired")
+
+    # 6. Check Revocation
+    revoked = session.get(JWTRevocationToken, (jti, "RBAC"))
+    if revoked:
+         raise HTTPException(status_code=403, detail="Token has been revoked")
     
     return payload
 
@@ -234,6 +237,36 @@ async def check_if_trusted_officer(
     
     return current_user
 
+async def check_if_auditor(
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Session = Depends(get_session),
+    x_role_token: Annotated[str | None, Header()] = None
+):
+    # Strict check: Admin is NOT automatically an Auditor for this purpose.
+    # The user must provide a valid Auditor token.
+    
+    if not x_role_token:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Missing X-Role-Token header"
+        )
+
+    # Verify signature and validity
+    payload = verify_rbac_token_signature(session, x_role_token)
+
+    # Verify ownership
+    if payload.get("sub") != str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Token does not belong to user"
+        )
+
+    # Verify Role
+    if payload.get("app_role") != Role.AUDITOR:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not an Auditor"
+        )
+    
+    return current_user
+
 async def check_if_admin_or_security_officer(
     current_user: Annotated[User, Depends(get_current_user)],
     session: Session = Depends(get_session),
@@ -277,29 +310,34 @@ async def get_current_clearance(
         return None
 
     try:
-        # 1. Decode without verification to get headers and payload
-        payload = jwt.get_unverified_claims(x_mls_token)
-        issuer_id = payload.get("iss")
-        exp = payload.get("exp")
-        sub = payload.get("sub")
-        jti = payload.get("jti")
+        # 1. Get Issuer ID from Header
+        header = jwt.get_unverified_header(x_mls_token)
+        issuer_id = header.get("kid")
         
-        if not issuer_id or not exp or not sub or not jti:
-             raise HTTPException(status_code=400, detail="Invalid MLS Token claims")
-
-        if str(sub) != str(current_user.id):
-             raise HTTPException(status_code=403, detail="MLS Token does not belong to user")
+        if not issuer_id:
+             raise HTTPException(status_code=400, detail="Missing 'kid' in JWT header")
 
         # 2. Fetch Issuer Public Key
         issuer = session.get(User, int(issuer_id))
         if not issuer or not issuer.public_key:
             raise HTTPException(status_code=400, detail="Issuer not found")
 
-        # 3. Verify Signature
+        # 3. Verify Signature & Decode
         print(f"DEBUG: Verifying with Public Key: {issuer.public_key!r}")
-        jwt.decode(x_mls_token, issuer.public_key, algorithms=["RS256"])
+        payload = jwt.decode(x_mls_token, issuer.public_key, algorithms=["RS256"])
 
-        # 4. Check Revocation
+        # 4. Extract & Verify Claims (from VERIFIED payload)
+        exp = payload.get("exp")
+        sub = payload.get("sub")
+        jti = payload.get("jti")
+        
+        if not exp or not sub or not jti:
+             raise HTTPException(status_code=400, detail="Invalid MLS Token claims")
+
+        if str(sub) != str(current_user.id):
+             raise HTTPException(status_code=403, detail="MLS Token does not belong to user")
+
+        # 5. Check Revocation
         revoked = session.get(JWTRevocationToken, (jti, "MLS"))
         if revoked:
             raise HTTPException(status_code=403, detail="MLS Token has been revoked")

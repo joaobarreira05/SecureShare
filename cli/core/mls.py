@@ -82,7 +82,9 @@ def sign_mls_token(payload: dict, private_key_pem: bytes) -> str:
     private_key = load_pem_private_key(private_key_pem, password=None)
     
     # Create header
-    header = {"alg": "RS256", "typ": "JWT"}
+    # We include 'kid' (Key ID) which corresponds to the issuer_id
+    issuer_id = payload.get("iss")
+    header = {"alg": "RS256", "typ": "JWT", "kid": str(issuer_id)}
     
     # Encode header and payload
     header_b64 = _base64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8"))

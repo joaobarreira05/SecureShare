@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, status
+import http
 from sqlmodel import Session
 from ..core.database import get_session
 from ..models.User import User, UserResponse, UserUpdate
@@ -12,6 +13,8 @@ async def get_my_info(current_user: User = Depends(get_current_user)):
     """
     Get current user information.
     """
+    action = f"GET /user/me/info {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
+    log_event(session, current_user.id, action)
     return current_user
 
 @router.post("/me/info", response_model=UserResponse)
@@ -23,4 +26,6 @@ async def update_my_info(
     """
     Updates existing information, such as the password.
     """
+    action = f"POST /user/me/info {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
+    log_event(session, current_user.id, action, "User info updated successfully")
     return await update_user_info(session, current_user, update_data)
