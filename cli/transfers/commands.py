@@ -84,7 +84,7 @@ def upload(
             payload_b64 += "=" * (-len(payload_b64) % 4)
             payload = json.loads(base64.urlsafe_b64decode(payload_b64))
             
-            user_level = payload.get("level", "UNCLASSIFIED")
+            user_level = payload.get("clearance", "UNCLASSIFIED")
             user_depts = set(payload.get("departments", []))
             
             # No Write Down: User Level <= File Level

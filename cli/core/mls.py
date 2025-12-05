@@ -56,7 +56,7 @@ def create_mls_payload(
         "sub": str(subject_id),
         "iat": now,
         "exp": exp,
-        "level": level,
+        "clearance": level,
         "departments": departments,
         "jti": jti
     }

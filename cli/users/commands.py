@@ -135,7 +135,7 @@ def select_clearance():
             payload_json = base64.urlsafe_b64decode(payload_b64).decode("utf-8")
             payload = json.loads(payload_json)
             
-            lvl = payload.get("level", "N/A")
+            lvl = payload.get("clearance", "N/A")
             depts = payload.get("departments", [])
             exp = payload.get("exp", "N/A")
             

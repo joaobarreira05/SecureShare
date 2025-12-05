@@ -167,7 +167,7 @@ def api_get_my_info(token: str) -> Optional[dict]:
     """
     Obtém informação do utilizador autenticado.
     """
-    url = f"{BASE_URL}/users/me"
+    url = f"{BASE_URL}/user/me/info"
     headers = {"Authorization": f"Bearer {token}"}
     try:
         resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=5)
@@ -235,9 +235,11 @@ def api_get_transfer(token: str, transfer_id: str, mls_token: Optional[str] = No
     try:
         resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=10)
         if resp.status_code != 200:
+            print(f"DEBUG: Transfer GET failed: {resp.status_code} - {resp.text}")
             return None
         return resp.json()
-    except Exception:
+    except Exception as e:
+        print(f"DEBUG: Transfer GET exception: {e}")
         return None
 
 def api_download_encrypted_file(token: str, transfer_id: str, mls_token: Optional[str] = None) -> Optional[bytes]:
