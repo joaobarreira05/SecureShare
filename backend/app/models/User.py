@@ -57,3 +57,15 @@ class VaultContent(SQLModel):
 
 class VaultUpdate(SQLModel):
     encrypted_private_key: str
+
+class UserUpdate(SQLModel):
+    full_name: str | None = None
+    email: EmailStr | None = None
+    password: str | None = None
+
+from .JWTRBACToken import JWTRBACToken
+from .JWTMLSToken import JWTMLSToken
+
+class UserClearanceResponse(SQLModel):
+    mls_tokens: list[JWTMLSToken]
+    rbac_tokens: list[JWTRBACToken]

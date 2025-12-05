@@ -8,20 +8,25 @@ from uuid import UUID
 from fastapi import HTTPException, UploadFile, status
 from sqlmodel import Session, select
 
-from app.models.Transfer import Transfer, TransferKey, SecurityLevel
-from transfers.dependencies import check_mls_write, check_mls_read
+from ..models.Transfer import Transfer, TransferKey, SecurityLevel
+from ..models.User import User
+from .dependencies import check_mls_write, check_mls_read
 
 STORAGE_DIR = "storage"
 os.makedirs(STORAGE_DIR, exist_ok=True)
 
 def create_transfer_service(
     db: Session,
-    user: dict,
+    user: User,
     file: UploadFile,
     classification: SecurityLevel,
     departments: str,
     recipient_keys: str,
-    expires_in_days: int
+    expires_in_days: int,
+    is_public: bool = False,
+    mls_payload: Optional[dict] = None,
+    justification: Optional[str] = None,
+    is_trusted_officer: bool = False
 ) -> UUID:
     # Parse departments
     try:
@@ -31,25 +36,32 @@ def create_transfer_service(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid departments format. Must be a JSON list of strings.")
 
-    # 1. MLS Write Check
-    check_mls_write(user, classification.value, dept_list)
+    # 1. MLS Write Check - SKIP for public transfers
+    if not is_public:
+        check_mls_write(
+            user=user, 
+            classification=classification, 
+            departments=dept_list,
+            mls_payload=mls_payload,
+            justification=justification,
+            is_trusted_officer=is_trusted_officer
+        )
 
     # 2. Create Transfer Object
     new_transfer = Transfer(
-        uploader_id=user["id"],
+        uploader_id=user.id,
         blob_path="", # Update later
         filename=file.filename,
         classification_level=classification,
         departments=departments,
-        is_public=False,
+        is_public=is_public,
         expires_at=datetime.utcnow() + timedelta(days=expires_in_days)
     )
     
-    # Save file to disk using ID
-    # We need to generate ID first. SQLModel defaults usually work, but let's instantiate to get ID if it's uuid4 factory.
-    # Since we used default_factory=uuid4, accessing .id should work if we let it generate or if we manually generate?
-    # Actually, default_factory runs when model is instantiated if not provided.
-    
+    db.add(new_transfer)
+    db.commit()
+    db.refresh(new_transfer)
+
     file_location = os.path.join(STORAGE_DIR, str(new_transfer.id))
     new_transfer.blob_path = file_location
 
@@ -82,30 +94,43 @@ def create_transfer_service(
 
 def get_transfer_metadata_service(
     db: Session,
-    user: dict,
-    transfer_id: UUID
+    user: User,
+    transfer_id: UUID,
+    mls_payload: Optional[dict] = None,
+    justification: Optional[str] = None,
+    is_trusted_officer: bool = False
 ) -> dict:
     transfer = db.get(Transfer, transfer_id)
     if not transfer:
         raise HTTPException(status_code=404, detail="Transfer not found")
 
-    # 1. MLS Read Check
+    # 1. MLS Read Check - SKIP for public transfers
     dept_list = json.loads(transfer.departments)
-    check_mls_read(user, transfer.classification_level.value, dept_list)
+    if not transfer.is_public:
+        check_mls_read(
+            user=user, 
+            classification=transfer.classification_level, 
+            departments=dept_list,
+            mls_payload=mls_payload,
+            justification=justification,
+            is_trusted_officer=is_trusted_officer
+        )
 
     # 2. Check Expiration
     if transfer.expires_at and transfer.expires_at < datetime.utcnow():
         raise HTTPException(status_code=410, detail="Transfer expired")
 
-    # 3. Check permissions
-    user_key = db.exec(
-        select(TransferKey)
-        .where(TransferKey.transfer_id == transfer_id)
-        .where(TransferKey.recipient_id == user["id"])
-    ).first()
+    # 3. Check permissions (public transfers don't need key check)
+    user_key = None
+    if not transfer.is_public:
+        user_key = db.exec(
+            select(TransferKey)
+            .where(TransferKey.transfer_id == transfer_id)
+            .where(TransferKey.recipient_id == user.id)
+        ).first()
 
-    if not user_key and transfer.uploader_id != user["id"]:
-         raise HTTPException(status_code=403, detail="Access denied. No key available for this user.")
+        if not user_key and transfer.uploader_id != user.id:
+             raise HTTPException(status_code=403, detail="Access denied. No key available for this user.")
 
     return {
         "id": transfer.id,
@@ -119,26 +144,38 @@ def get_transfer_metadata_service(
 
 def get_transfer_file_stream_service(
     db: Session,
-    user: dict,
-    transfer_id: UUID
+    user: User,
+    transfer_id: UUID,
+    mls_payload: Optional[dict] = None,
+    justification: Optional[str] = None,
+    is_trusted_officer: bool = False
 ) -> Generator[bytes, None, None]:
     transfer = db.get(Transfer, transfer_id)
     if not transfer:
         raise HTTPException(status_code=404, detail="Transfer not found")
 
-    # 1. MLS Read Check
+    # 1. MLS Read Check - SKIP for public transfers
     dept_list = json.loads(transfer.departments)
-    check_mls_read(user, transfer.classification_level.value, dept_list)
+    if not transfer.is_public:
+        check_mls_read(
+            user=user, 
+            classification=transfer.classification_level, 
+            departments=dept_list,
+            mls_payload=mls_payload,
+            justification=justification,
+            is_trusted_officer=is_trusted_officer
+        )
 
-    # 2. Check permissions
-    user_key = db.exec(
-        select(TransferKey)
-        .where(TransferKey.transfer_id == transfer_id)
-        .where(TransferKey.recipient_id == user["id"])
-    ).first()
+    # 2. Check permissions (public transfers are open)
+    if not transfer.is_public:
+        user_key = db.exec(
+            select(TransferKey)
+            .where(TransferKey.transfer_id == transfer_id)
+            .where(TransferKey.recipient_id == user.id)
+        ).first()
 
-    if not transfer.is_public and not user_key and transfer.uploader_id != user["id"]:
-        raise HTTPException(status_code=403, detail="Access denied.")
+        if not user_key and transfer.uploader_id != user.id:
+            raise HTTPException(status_code=403, detail="Access denied.")
 
     # 3. Stream file
     if not os.path.exists(transfer.blob_path):
@@ -152,23 +189,23 @@ def get_transfer_file_stream_service(
 
 def list_user_transfers_service(
     db: Session,
-    user: dict
+    user: User
 ) -> List[Transfer]:
     transfers = db.exec(
-        select(Transfer).where(Transfer.uploader_id == user["id"])
+        select(Transfer).where(Transfer.uploader_id == user.id)
     ).all()
     return transfers
 
 def delete_transfer_service(
     db: Session,
-    user: dict,
+    user: User,
     transfer_id: UUID
 ):
     transfer = db.get(Transfer, transfer_id)
     if not transfer:
         raise HTTPException(status_code=404, detail="Transfer not found")
 
-    if transfer.uploader_id != user["id"]:
+    if transfer.uploader_id != user.id:
         raise HTTPException(status_code=403, detail="Only the uploader can delete this transfer")
 
     # Delete keys
