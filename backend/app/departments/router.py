@@ -17,6 +17,8 @@ async def create_new_department(
     """
     Create a new department (Admin only).
     """
+    action = f"POST /departments {status.HTTP_201_CREATED} {http.HTTPStatus(status.HTTP_201_CREATED).phrase}"
+    log_event(session, current_admin.id, action, "Department created successfully")
     return create_department(session, department)
 
 @router.get("", response_model=list[DepartmentResponse])
@@ -27,6 +29,8 @@ async def read_departments(
     """
     List all departments (Admin only).
     """
+    action = f"POST /departments {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
+    log_event(session, current_admin.id, action, "Departments listed successfully")
     return get_all_departments(session)
 
 @router.delete("/{dept_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -38,4 +42,6 @@ async def remove_department(
     """
     Delete a department (Admin only).
     """
+    action = f"POST /departments/{dept_id} {status.HTTP_204_NO_CONTENT} {http.HTTPStatus(status.HTTP_204_NO_CONTENT).phrase}"
+    log_event(session, current_admin.id, action, "Department deleted successfully")
     delete_department(session, dept_id)

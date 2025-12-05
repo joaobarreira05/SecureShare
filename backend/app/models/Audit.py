@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 from sqlmodel import Field, SQLModel
+from pydantic import BaseModel
 import hashlib
 import json
 
@@ -9,9 +10,9 @@ class AuditLog(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(microsecond=0))
-    actor_username: str = Field(index=True)
+    actor_id: int = Field(index=True)
     action: str
-    details: str  # JSON dump
+    details: Optional[str] = Field(default=None)
     signature: Optional[str] = Field(default=None)
     previous_hash: str
     current_hash: str
@@ -24,7 +25,7 @@ class AuditLog(SQLModel, table=True):
         data = (
             self.previous_hash +
             ts_str +
-            self.actor_username +
+            self.actor_id +
             self.action +
             self.details
         )

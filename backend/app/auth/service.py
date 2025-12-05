@@ -234,6 +234,36 @@ async def check_if_trusted_officer(
     
     return current_user
 
+async def check_if_auditor(
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Session = Depends(get_session),
+    x_role_token: Annotated[str | None, Header()] = None
+):
+    # Strict check: Admin is NOT automatically an Auditor for this purpose.
+    # The user must provide a valid Auditor token.
+    
+    if not x_role_token:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Missing X-Role-Token header"
+        )
+
+    # Verify signature and validity
+    payload = verify_rbac_token_signature(session, x_role_token)
+
+    # Verify ownership
+    if payload.get("sub") != str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Token does not belong to user"
+        )
+
+    # Verify Role
+    if payload.get("app_role") != Role.AUDITOR:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not an Auditor"
+        )
+    
+    return current_user
+
 async def check_if_admin_or_security_officer(
     current_user: Annotated[User, Depends(get_current_user)],
     session: Session = Depends(get_session),

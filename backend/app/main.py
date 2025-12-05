@@ -5,7 +5,7 @@ from .core.settings import settings
 from .models.User import User # Import models to register them with SQLModel
 from .models.JWTAuthToken import JWTAuthToken
 from .models.Department import Department
-from .models.Audit import AuditLog, AuditCheckpoint
+from .models.Audit import AuditLog
 from .core.init_db import init_db
 
 @asynccontextmanager
@@ -17,7 +17,7 @@ async def lifespan(app: FastAPI):
 from .auth.router import router as auth_router
 from .users.router import router as users_router
 from .departments.router import router as departments_router
-from transfers.router import router as transfers_router
+from .transfers.router import router as transfers_router
 from .audit.router import router as audit_router
 from .user.router import router as user_router
 

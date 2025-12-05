@@ -1,9 +1,9 @@
 from sqlmodel import Session, select
-from app.models.Audit import AuditLog, AuditCheckpoint
+from app.models.Audit import AuditLog
 from datetime import datetime, timezone
 from typing import Optional
 
-def log_event(db: Session, actor_username: str, action: str, details: str) -> AuditLog:
+def log_event(db: Session, actor_id: int, action: str, details: Optional[str] = None) -> AuditLog:
     """
     Logs a new event to the AuditLog chain.
     """
@@ -17,7 +17,7 @@ def log_event(db: Session, actor_username: str, action: str, details: str) -> Au
 
     # 3. Create the new object
     new_log = AuditLog(
-        actor_username=actor_username,
+        actor_id=actor_id,
         action=action,
         details=details,
         previous_hash=previous_hash,
