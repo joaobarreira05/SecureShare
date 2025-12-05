@@ -66,6 +66,21 @@ def api_get_vault(token: str) -> Optional[str]:
     except Exception:
         return None
 
+
+def api_update_vault(token: str, encrypted_private_key: str) -> bool:
+    """
+    Updates the vault (encrypted_private_key) on the server.
+    Used when changing password to re-encrypt the private key.
+    """
+    url = f"{BASE_URL}/users/me/vault"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    try:
+        resp = requests.put(url, json={"encrypted_private_key": encrypted_private_key}, headers=headers, verify=_get_verify(), timeout=10)
+        return resp.status_code in (200, 204)
+    except Exception:
+        return False
+
+
 def api_create_user(token: str, user_data: dict) -> bool:
     """
     Cria um novo utilizador no backend (Admin only).
@@ -126,6 +141,23 @@ def api_get_user_by_username(token: str, username: str, rbac_token: Optional[str
     return None
 
 
+def api_revoke_token(token: str, user_id: int, token_id: str, revocation_data: dict, rbac_token: str) -> bool:
+    """
+    Revokes a token for a user (Security Officer only).
+    """
+    url = f"{BASE_URL}/users/{user_id}/revoke/{token_id}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Role-Token": rbac_token,
+        "Content-Type": "application/json"
+    }
+    try:
+        resp = requests.put(url, json=revocation_data, headers=headers, verify=_get_verify(), timeout=10)
+        return resp.status_code in (200, 204)
+    except Exception:
+        return False
+
+
 def api_get_user_public_key(token: str, user_id: int) -> Optional[str]:
     """
     Obtém a public key de um utilizador pelo ID.
@@ -141,13 +173,15 @@ def api_get_user_public_key(token: str, user_id: int) -> Optional[str]:
     except Exception:
         return None
 
-def api_get_user_clearances(token: str, user_id: int) -> Optional[dict]:
+def api_get_user_clearances(token: str, user_id: int, rbac_token: Optional[str] = None) -> Optional[dict]:
     """
     Obtém clearances e roles do utilizador.
     Retorna dict com mls_tokens e rbac_tokens.
     """
     url = f"{BASE_URL}/users/{user_id}/clearance"
     headers = {"Authorization": f"Bearer {token}"}
+    if rbac_token:
+        headers["X-Role-Token"] = rbac_token
     try:
         resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=10)
         if resp.status_code != 200:

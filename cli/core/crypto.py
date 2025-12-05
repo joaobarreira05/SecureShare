@@ -10,6 +10,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from cli.core.session import load_token
+from cli.core.api import api_get_vault
 
 
 def derive_key_from_password(password: str, salt: bytes, length: int = 32) -> bytes:
@@ -105,14 +107,32 @@ def generate_rsa_keypair() -> Tuple[bytes, bytes]:
     return private_pem, public_pem
 
 
+def decrypt_vault(encrypted_vault: str, password: str) -> bytes:
+    """
+    Decrypts the vault JSON string and returns the private key PEM bytes.
+    Used for password rotation.
+    """
+    import json
+    vault_obj = json.loads(encrypted_vault)
+    
+    salt = base64.b64decode(vault_obj["salt"])
+    nonce = base64.b64decode(vault_obj["nonce"])
+    ciphertext = base64.b64decode(vault_obj["ciphertext"])
+    
+    encryption_key = derive_key_from_password(password, salt, length=32)
+    aesgcm = AESGCM(encryption_key)
+    private_key_pem = aesgcm.decrypt(nonce, ciphertext, None)
+    
+    return private_key_pem
+
+
 def load_private_key_from_vault() -> object:
     """
     Busca o vault do servidor via API,
     pede password ao utilizador,
     devolve um objeto private_key (RSA) pronto a usar.
     """
-    from cli.core.session import load_token
-    from cli.core.api import api_get_vault
+
     
     # 1) Obter token de sessão
     token = load_token()

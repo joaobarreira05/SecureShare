@@ -7,7 +7,7 @@ import json
 
 
 from cli.core.session import save_token, load_token, clear_token, is_logged_in
-from cli.core.api import api_login, api_logout, api_get_vault
+from cli.core.api import api_login, api_logout, api_get_vault, api_activate
 from cli.core.crypto import generate_rsa_keypair, encrypt_private_key_with_password
 
 
@@ -112,7 +112,7 @@ def activate():
     vault_obj = encrypt_private_key_with_password(private_pem, password)
 
     # Preparar dados para o backend
-    from cli.core.api import api_activate
+    
     activation_data = {
         "username": username,
         "otp": otp,
