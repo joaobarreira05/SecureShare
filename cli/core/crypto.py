@@ -16,39 +16,39 @@ from cli.core.api import api_get_vault
 
 def derive_key_from_password(password: str, salt: bytes, length: int = 32) -> bytes:
     """
-    Deriva uma chave simétrica a partir de uma password usando PBKDF2-HMAC-SHA256.
-    - password: password em texto (str)
-    - salt: bytes aleatórios (únicos por utilizador / por vault)
-    - length: tamanho da chave derivada, por defeito 32 bytes (256 bits)
+    Derives a symmetric key from a password using PBKDF2-HMAC-SHA256.
+    - password: password as text (str)
+    - salt: random bytes (unique per user / per vault)
+    - length: derived key size, default 32 bytes (256 bits)
     """
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=length,
         salt=salt,
-        iterations=480_000,  # número elevado de iterações para dificultar brute-force
+        iterations=480_000,  # high iteration count to hinder brute-force
     )
     return kdf.derive(password.encode("utf-8"))
 
 def encrypt_private_key_with_password(private_pem: bytes, password: str) -> dict:
     """
-    Encripta a chave privada em PEM com uma password.
-    Usa:
-      - PBKDF2-HMAC-SHA256 para derivar a chave
-      - AES-256-GCM para encriptar
-    Devolve um dict pronto a ser serializado em JSON (vault).
+    Encrypts the private key in PEM format with a password.
+    Uses:
+      - PBKDF2-HMAC-SHA256 to derive the key
+      - AES-256-GCM to encrypt
+    Returns a dict ready to be serialized as JSON (vault).
     """
-    # 1) gerar salt aleatório (para KDF) e nonce aleatório (para AES-GCM)
+    # 1) Generate random salt (for KDF) and random nonce (for AES-GCM)
     salt = os.urandom(16)   # 128 bits
-    nonce = os.urandom(12)  # tamanho recomendado para AES-GCM
+    nonce = os.urandom(12)  # recommended size for AES-GCM
 
-    # 2) derivar chave simétrica de 256 bits (32 bytes)
+    # 2) Derive 256-bit symmetric key (32 bytes)
     key = derive_key_from_password(password, salt, length=32)
 
-    # 3) encriptar private_pem com AES-GCM
+    # 3) Encrypt private_pem with AES-GCM
     aesgcm = AESGCM(key)
     ciphertext = aesgcm.encrypt(nonce, private_pem, associated_data=None)
 
-    # 4) devolver tudo num objeto "vault" serializável em JSON
+    # 4) Return everything in a JSON-serializable "vault" object
     return {
         "kdf": "pbkdf2-hmac-sha256",
         "kdf_iterations": 480000,
@@ -60,13 +60,13 @@ def encrypt_private_key_with_password(private_pem: bytes, password: str) -> dict
 
 def decrypt_private_key_with_password(vault_obj: dict, password: str) -> bytes:
     """
-    Desencripta o vault usando a password.
-    Devolve a chave privada em PEM (bytes).
+    Decrypts the vault using the password.
+    Returns the private key in PEM format (bytes).
     """
     if vault_obj.get("kdf") != "pbkdf2-hmac-sha256":
-        raise ValueError("KDF não suportado")
+        raise ValueError("KDF not supported")
     if vault_obj.get("cipher") != "aes-256-gcm":
-        raise ValueError("Cipher não suportado")
+        raise ValueError("Cipher not supported")
 
     salt = base64.b64decode(vault_obj["salt"])
     nonce = base64.b64decode(vault_obj["nonce"])
@@ -82,22 +82,22 @@ def decrypt_private_key_with_password(vault_obj: dict, password: str) -> bytes:
 
 def generate_rsa_keypair() -> Tuple[bytes, bytes]:
     """
-    Gera um par de chaves RSA (chave privada e chave pública) em formato PEM.
-    Devolve (private_pem, public_pem).
+    Generates an RSA key pair (private and public key) in PEM format.
+    Returns (private_pem, public_pem).
     """
     private_key = rsa.generate_private_key(
         public_exponent=65537,
-        key_size=4096,  # 4096 bits conforme o enunciado sugere
+        key_size=4096,  # 4096 bits as suggested in requirements
     )
 
-    # Exportar a chave privada em PEM, sem encriptação (vamos encriptar nós depois)
+    # Export private key in PEM, without encryption (we encrypt it ourselves later)
     private_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     )
 
-    # Exportar a chave pública em PEM
+    # Export public key in PEM
     public_key = private_key.public_key()
     public_pem = public_key.public_bytes(
         encoding=serialization.Encoding.PEM,
@@ -128,51 +128,51 @@ def decrypt_vault(encrypted_vault: str, password: str) -> bytes:
 
 def load_private_key_from_vault() -> object:
     """
-    Busca o vault do servidor via API,
-    pede password ao utilizador,
-    devolve um objeto private_key (RSA) pronto a usar.
+    Fetches the vault from the server via API,
+    prompts user for password,
+    returns a private_key object (RSA) ready to use.
     """
 
     
-    # 1) Obter token de sessão
+    # 1) Get session token
     token = load_token()
     if not token:
-        raise ValueError("Sem sessão ativa. Faz login primeiro.")
+        raise ValueError("No active session. Please login first.")
     
-    # 2) Buscar vault do servidor
+    # 2) Fetch vault from server
     vault_json = api_get_vault(token)
     if not vault_json:
-        raise FileNotFoundError("Vault não encontrado no servidor. A conta foi ativada?")
+        raise FileNotFoundError("Vault not found on server. Was the account activated?")
     
     try:
         vault_obj = json.loads(vault_json)
     except json.JSONDecodeError:
-        raise ValueError("Vault inválido recebido do servidor.")
+        raise ValueError("Invalid vault received from server.")
 
-    # 3) Pedir password ao user
-    password = getpass.getpass("Password do vault: ")
+    # 3) Prompt user for password
+    password = getpass.getpass("Vault password: ")
 
-    # 4) Desencriptar
+    # 4) Decrypt
     try:
         private_pem = decrypt_private_key_with_password(vault_obj, password)
     except Exception as e:
-        raise ValueError(f"Falha ao desencriptar vault: {e}")
+        raise ValueError(f"Failed to decrypt vault: {e}")
 
-    # 5) Converter PEM → objeto private_key
+    # 5) Convert PEM to private_key object
     private_key = load_pem_private_key(private_pem, password=None)
 
     return private_key
 
 def generate_file_key() -> bytes:
     """
-    Gera uma File Key simétrica AES-256 (32 bytes).
+    Generates a symmetric AES-256 File Key (32 bytes).
     """
     return os.urandom(32)
 
 def encrypt_file_with_aes_gcm(file_bytes: bytes, file_key: bytes) -> tuple[bytes, bytes]:
     """
-    Cifra o ficheiro com AES-256-GCM.
-    Devolve (nonce, ciphertext).
+    Encrypts the file with AES-256-GCM.
+    Returns (nonce, ciphertext).
     """
     nonce = os.urandom(12)
     aesgcm = AESGCM(file_key)
@@ -181,7 +181,7 @@ def encrypt_file_with_aes_gcm(file_bytes: bytes, file_key: bytes) -> tuple[bytes
 
 def encrypt_file_key_for_user(file_key: bytes, user_public_key_pem: bytes) -> bytes:
     """
-    Cifra a File Key com a public key de um destinatário (RSA-OAEP).
+    Encrypts the File Key with the recipient's public key (RSA-OAEP).
     """
     public_key = serialization.load_pem_public_key(user_public_key_pem)
 
@@ -198,7 +198,7 @@ def encrypt_file_key_for_user(file_key: bytes, user_public_key_pem: bytes) -> by
 
 def decrypt_file_with_aes_gcm(file_key: bytes, nonce: bytes, ciphertext: bytes) -> bytes:
     """
-    Desencripta um ficheiro cifrado com AES-256-GCM.
+    Decrypts a file encrypted with AES-256-GCM.
     """
     aesgcm = AESGCM(file_key)
     plaintext = aesgcm.decrypt(nonce, ciphertext, associated_data=None)

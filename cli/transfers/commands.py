@@ -37,20 +37,20 @@ LEVEL_MAP = {
     "UNCLASSIFIED": 1
 }
 
-app = typer.Typer(help="Comandos de transferência de ficheiros (upload/download).")
+app = typer.Typer(help="File transfer commands (upload/download).")
 
 
 @app.command("upload")
 def upload(
-    filepath: str = typer.Argument(..., help="Caminho para o ficheiro a enviar"),
+    filepath: str = typer.Argument(..., help="Path to the file to upload"),
     recipients: Optional[List[int]] = typer.Option(
-        None, "--to", "-t", help="IDs dos destinatários (obrigatório se não for público)"
+        None, "--to", "-t", help="Recipient IDs (required if not public)"
     ),
-    level: str = typer.Option("UNCLASSIFIED", "--level", "-l", help="Nível de segurança (TOP_SECRET, SECRET, CONFIDENTIAL, UNCLASSIFIED)"),
-    departments: Optional[List[str]] = typer.Option(None, "--dept", "-d", help="Departamentos associados"),
-    expire_days: int = typer.Option(7, "--expire-days", help="Dias para expirar"),
-    public: bool = typer.Option(False, "--public", help="Criar partilha pública (link com chave)"),
-    justification: Optional[str] = typer.Option(None, "--justification", "-j", help="Justificação para bypass MLS (Trusted Officer)"),
+    level: str = typer.Option("UNCLASSIFIED", "--level", "-l", help="Security level (TOP_SECRET, SECRET, CONFIDENTIAL, UNCLASSIFIED)"),
+    departments: Optional[List[str]] = typer.Option(None, "--dept", "-d", help="Associated departments"),
+    expire_days: int = typer.Option(7, "--expire-days", help="Days until expiration"),
+    public: bool = typer.Option(False, "--public", help="Create public share (link with key)"),
+    justification: Optional[str] = typer.Option(None, "--justification", "-j", help="Justification for MLS bypass (Trusted Officer)"),
 ):
     """
     Upload E2EE de um ficheiro.

@@ -1,35 +1,35 @@
 # cli/user/commands.py
 """
-Comandos do utilizador atual (ver info, etc.)
+Current user commands (view info, etc.)
 """
 import typer
 from cli.core.session import load_token
 from cli.core.api import api_get_my_info, api_update_my_info
 
-app = typer.Typer(help="Comandos do utilizador atual (info, etc.)")
+app = typer.Typer(help="Current user commands (info, etc.)")
 
 
 @app.command("me")
 def me():
     """
-    Mostra informação do utilizador atual.
+    Show current user information.
     """
     token = load_token()
     if not token:
-        typer.echo("Não tens sessão ativa. Faz primeiro login.")
+        typer.echo("No active session. Please login first.")
         raise typer.Exit(code=1)
 
     info = api_get_my_info(token)
     if not info:
-        typer.echo("Falha ao obter informação do utilizador.")
+        typer.echo("Failed to get user information.")
         raise typer.Exit(code=1)
 
-    typer.echo("\n👤 Informação do Utilizador:")
+    typer.echo("\n👤 User Information:")
     typer.echo(f"   ID:       {info.get('id', '-')}")
     typer.echo(f"   Username: {info.get('username', '-')}")
     typer.echo(f"   Email:    {info.get('email', '-')}")
-    typer.echo(f"   Nome:     {info.get('full_name', '-')}")
-    typer.echo(f"   Ativo:    {'✅' if info.get('is_active') else '❌'}")
+    typer.echo(f"   Name:     {info.get('full_name', '-')}")
+    typer.echo(f"   Active:   {'✅' if info.get('is_active') else '❌'}")
     typer.echo(f"   Admin:    {'✅' if info.get('is_admin') else '❌'}")
 
 
@@ -99,19 +99,19 @@ def update_password():
 
 @app.command("update-info")
 def update_info(
-    email: str = typer.Option(None, "--email", "-e", help="Novo email"),
-    name: str = typer.Option(None, "--name", "-n", help="Novo nome completo"),
+    email: str = typer.Option(None, "--email", "-e", help="New email"),
+    name: str = typer.Option(None, "--name", "-n", help="New full name"),
 ):
     """
-    Atualiza informações do utilizador (email, nome).
+    Update user information (email, name).
     """
     token = load_token()
     if not token:
-        typer.echo("Não tens sessão ativa. Faz primeiro login.")
+        typer.echo("No active session. Please login first.")
         raise typer.Exit(code=1)
 
     if not email and not name:
-        typer.echo("Indica pelo menos um campo para atualizar (--email ou --name).")
+        typer.echo("Specify at least one field to update (--email or --name).")
         raise typer.Exit(code=1)
 
     update_data = {}

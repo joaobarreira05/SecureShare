@@ -6,19 +6,19 @@ from .config import SESSION_FILE, MLS_TOKEN_FILE, RBAC_TOKEN_FILE
 
 
 def is_logged_in() -> bool:
-    """Verifica se há uma sessão ativa."""
+    """Check if there is an active session."""
     return SESSION_FILE.exists() and load_token() is not None
 
 
 def save_token(access_token: str) -> None:
-    """Guarda o access_token."""
+    """Save the access token."""
     data = {"access_token": access_token}
     with open(SESSION_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f)
 
 
 def load_token() -> Optional[str]:
-    """Lê o access_token da sessão."""
+    """Read the session access token."""
     if not SESSION_FILE.exists():
         return None
     try:
@@ -30,7 +30,7 @@ def load_token() -> Optional[str]:
 
 
 def clear_token() -> None:
-    """Apaga todos os ficheiros de sessão."""
+    """Delete all session files."""
     if SESSION_FILE.exists():
         SESSION_FILE.unlink()
     if MLS_TOKEN_FILE.exists():
