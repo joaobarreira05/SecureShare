@@ -15,11 +15,9 @@ import base64
 
 
 VALID_ROLES = [
-    "ADMINISTRATOR",
     "SECURITY_OFFICER",
     "TRUSTED_OFFICER",
     "AUDITOR",
-    "STANDARD_USER"
 ]
 
 

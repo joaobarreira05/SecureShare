@@ -20,6 +20,11 @@ Ativa conta nova com OTP e define password. Gera par de chaves.
 ---
 
 ## Utilizador Atual
+# Alterar password
+python3 -m cli.main user update-password
+
+# Atualizar email e/ou nome
+python3 -m cli.main user update-info --email novo@email.com --name "Novo Nome"
 
 ```bash
 python3 -m cli.main user me
@@ -29,6 +34,12 @@ Mostra informação do utilizador atual (ID, username, email, etc.).
 ---
 
 ## Gestão de Utilizadores (Admin/SO)
+
+# Apagar user com confirmação
+python3 -m cli.main users delete user3
+
+# Apagar sem confirmação
+python3 -m cli.main users delete user3 --force
 
 ```bash
 python3 -m cli.main users list
