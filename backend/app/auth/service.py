@@ -159,7 +159,7 @@ def verify_rbac_token_signature(session: Session, signed_jwt: str):
         raise HTTPException(status_code=400, detail="Token has expired")
 
     # 4. Check Revocation
-    revoked = session.get(JWTRevocationToken, jti)
+    revoked = session.get(JWTRevocationToken, (jti, "RBAC"))
     if revoked:
          raise HTTPException(status_code=403, detail="Token has been revoked")
 
@@ -300,7 +300,7 @@ async def get_current_clearance(
         jwt.decode(x_mls_token, issuer.public_key, algorithms=["RS256"])
 
         # 4. Check Revocation
-        revoked = session.get(JWTRevocationToken, jti)
+        revoked = session.get(JWTRevocationToken, (jti, "MLS"))
         if revoked:
             raise HTTPException(status_code=403, detail="MLS Token has been revoked")
             

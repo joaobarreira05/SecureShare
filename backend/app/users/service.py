@@ -80,7 +80,7 @@ async def verify_and_store_role_token(session: Session, signed_jwt: str):
         raise HTTPException(status_code=400, detail=f"Invalid signature: {str(e)}")
 
     # 5. Check Revocation
-    revoked = session.get(JWTRevocationToken, jti)
+    revoked = session.get(JWTRevocationToken, (jti, "RBAC"))
     if revoked:
         raise HTTPException(status_code=403, detail="Token has been revoked")
 
@@ -132,6 +132,9 @@ async def verify_and_store_role_token(session: Session, signed_jwt: str):
 
 async def verify_and_store_revocation_token(session: Session, token_data: JWTRevocationToken):
     # 1. Verify Issuer is Security Officer
+    if token_data.token_type not in ["MLS", "RBAC"]:
+        raise HTTPException(status_code=400, detail="Invalid token type. Must be 'MLS' or 'RBAC'.")
+
     issuer_user = session.get(User, token_data.revoker_id)
     if not issuer_user:
         raise HTTPException(status_code=400, detail="Revoker not found")
@@ -192,7 +195,7 @@ async def verify_and_store_mls_token(session: Session, signed_jwt: str):
         raise HTTPException(status_code=400, detail=f"Invalid signature: {str(e)}")
 
     # 5. Check Revocation
-    revoked = session.get(JWTRevocationToken, jti)
+    revoked = session.get(JWTRevocationToken, (jti, "MLS"))
     if revoked:
         raise HTTPException(status_code=403, detail="Token has been revoked")
 
