@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlmodel import Session, select
 from ..models.User import User, UserCreate
 from ..auth.service import get_password_hash
+from ..models.JWTAuthToken import JWTAuthToken
 
 async def create_user(session: Session, user: UserCreate):
     statement = select(User).where(User.username == user.username)
@@ -29,6 +30,24 @@ async def delete_user(session: Session, user_id: int):
     db_user = session.get(User, user_id)
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # Delete Auth Tokens
+    statement_auth = select(JWTAuthToken).where(JWTAuthToken.user_id == user_id)
+    auth_tokens = session.exec(statement_auth).all()
+    for token in auth_tokens:
+        session.delete(token)
+
+    # Delete RBAC Tokens
+    statement_rbac = select(JWTRBACToken).where(JWTRBACToken.sub == str(user_id))
+    rbac_tokens = session.exec(statement_rbac).all()
+    for token in rbac_tokens:
+        session.delete(token)
+
+    # Delete MLS Tokens
+    statement_mls = select(JWTMLSToken).where(JWTMLSToken.user_id == user_id)
+    mls_tokens = session.exec(statement_mls).all()
+    for token in mls_tokens:
+        session.delete(token)
     
     session.delete(db_user)
     session.commit()
