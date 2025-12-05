@@ -8,7 +8,7 @@ import base64
 import json
 from datetime import datetime, timedelta, timezone
 
-from cli.core.session import load_token, load_mls_token
+from cli.core.session import load_token, load_mls_token, load_rbac_token
 from cli.core.api import (
     api_get_user_by_username,
     api_get_user_public_key,
@@ -50,10 +50,12 @@ def upload(
     departments: Optional[List[str]] = typer.Option(None, "--dept", "-d", help="Departamentos associados"),
     expire_days: int = typer.Option(7, "--expire-days", help="Dias para expirar"),
     public: bool = typer.Option(False, "--public", help="Criar partilha pública (link com chave)"),
+    justification: Optional[str] = typer.Option(None, "--justification", "-j", help="Justificação para bypass MLS (Trusted Officer)"),
 ):
     """
     Upload E2EE de um ficheiro.
     Usa --to ID para especificar destinatários ou --public para partilha pública.
+    Trusted Officers podem usar --justification para bypass MLS.
     """
     token = load_token()
     if not token:
@@ -150,6 +152,9 @@ def upload(
 
     try:
         # 6) Chamar API (multipart form)
+        # Se há justification, carregar RBAC token (para Trusted Officer)
+        rbac_token = load_rbac_token() if justification else None
+        
         transfer_id = api_upload_transfer(
             token=token,
             file_path=tmp_path,
@@ -158,7 +163,9 @@ def upload(
             recipient_keys=recipient_keys,
             expires_in_days=expire_days,
             mls_token=mls_token,
-            is_public=public
+            is_public=public,
+            rbac_token=rbac_token,
+            justification=justification
         )
         
         if transfer_id:
@@ -184,9 +191,11 @@ def download(
         "-o",
         help="Caminho para guardar o ficheiro (por omissão usa o filename da transferência)",
     ),
+    justification: Optional[str] = typer.Option(None, "--justification", "-j", help="Justificação para bypass MLS (Trusted Officer)"),
 ):
     """
     Download E2EE de um ficheiro.
+    Trusted Officers podem usar --justification para bypass MLS.
     """
     token = load_token()
     if not token:
@@ -194,6 +203,7 @@ def download(
         raise typer.Exit(code=1)
 
     mls_token = load_mls_token()
+    rbac_token = load_rbac_token() if justification else None
 
     # Suporte para Link Público (URL com fragmento)
     public_key_fragment = None
@@ -209,7 +219,7 @@ def download(
             pass
 
     # 1) Obter metadata
-    meta = api_get_transfer(token, transfer_id, mls_token=mls_token)
+    meta = api_get_transfer(token, transfer_id, mls_token=mls_token, rbac_token=rbac_token, justification=justification)
     if not meta:
         typer.echo("Falha ao obter metadata da transferência.")
         raise typer.Exit(code=1)
@@ -244,7 +254,7 @@ def download(
         encrypted_file_key = base64.b64decode(encrypted_key_b64)
 
     # 2) Obter o ficheiro cifrado (blob)
-    encrypted_blob = api_download_encrypted_file(token, transfer_id, mls_token=mls_token)
+    encrypted_blob = api_download_encrypted_file(token, transfer_id, mls_token=mls_token, rbac_token=rbac_token, justification=justification)
     if encrypted_blob is None:
         typer.echo("Falha ao descarregar o ficheiro cifrado.")
         raise typer.Exit(code=1)
