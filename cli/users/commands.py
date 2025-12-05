@@ -4,7 +4,7 @@ from typing import Optional, List
 import json
 import base64
 from cli.core.session import load_token, save_mls_token, load_rbac_token, save_rbac_token
-from cli.core.api import api_create_user, api_get_user_clearances, api_get_user_by_username, api_assign_role, api_get_my_info, api_assign_clearance
+from cli.core.api import api_create_user, api_delete_user, api_get_user_clearances, api_get_user_by_username, api_assign_role, api_get_my_info, api_assign_clearance, api_get_all_users
 from cli.core.rbac import create_rbac_payload, sign_rbac_token, decode_rbac_token, VALID_ROLES
 from cli.core.mls import create_mls_payload, sign_mls_token, VALID_LEVELS
 from cli.core.crypto import load_private_key_from_vault
@@ -60,6 +60,44 @@ def create_user():
         raise typer.Exit(code=1)
 
 
+@app.command("delete")
+def delete_user(
+    username: str = typer.Argument(..., help="Username do utilizador a apagar"),
+    force: bool = typer.Option(False, "--force", "-f", help="Apagar sem confirmação"),
+):
+    """
+    Apaga um utilizador (Admin only).
+    """
+    token = load_token()
+    if not token:
+        typer.echo("Não tens sessão ativa. Faz primeiro login.")
+        raise typer.Exit(code=1)
+
+    # Obter RBAC token para aceder à lista de users
+    rbac_token = load_rbac_token()
+
+    # Obter info do user a apagar
+    target_user = api_get_user_by_username(token, username, rbac_token)
+    if not target_user:
+        typer.echo(f"Utilizador '{username}' não encontrado.")
+        raise typer.Exit(code=1)
+
+    user_id = target_user.get("id")
+    
+    # Confirmação
+    if not force:
+        confirm = typer.confirm(f"Tens a certeza que queres apagar o utilizador '{username}' (ID: {user_id})?")
+        if not confirm:
+            typer.echo("Operação cancelada.")
+            raise typer.Exit(code=0)
+
+    if api_delete_user(token, user_id):
+        typer.echo(f"Utilizador '{username}' apagado com sucesso! 🗑️")
+    else:
+        typer.echo("Falha ao apagar utilizador. Verifica se tens permissões de Admin.")
+        raise typer.Exit(code=1)
+
+
 @app.command("list")
 def list_users():
     """
@@ -73,12 +111,11 @@ def list_users():
     # Obter RBAC token se existir
     rbac_token = load_rbac_token()
     
-    from cli.core.api import api_get_all_users
     users = api_get_all_users(token, rbac_token)
     
-    if users is None:
-        typer.echo("Falha ao listar utilizadores. Verifica se tens permissões (Admin ou Security Officer).")
-        raise typer.Exit(code=1)
+    if not users:
+        typer.echo("Nenhum utilizador encontrado ou sem permissões.")
+        return
 
     if not users:
         typer.echo("Nenhum utilizador encontrado.")
