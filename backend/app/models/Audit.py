@@ -25,9 +25,9 @@ class AuditLog(SQLModel, table=True):
         data = (
             self.previous_hash +
             ts_str +
-            self.actor_id +
+            str(self.actor_id) +
             self.action +
-            self.details
+            (self.details or "")
         )
         return hashlib.sha256(data.encode("utf-8")).hexdigest()
 

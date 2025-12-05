@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+import http
 from sqlmodel import Session, SQLModel
 from ..core.database import get_session
 from ..models.User import VaultContent, VaultUpdate, UserCreate, UserResponse
