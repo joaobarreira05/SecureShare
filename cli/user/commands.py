@@ -77,12 +77,14 @@ def update_password():
     # 4) Re-encrypt vault with new password
     try:
         new_vault = encrypt_private_key_with_password(private_key_pem, new_password)
+        import json
+        new_vault_str = json.dumps(new_vault)
     except Exception as e:
         typer.echo(f"Failed to encrypt vault: {e}")
         raise typer.Exit(code=1)
 
     # 5) Update vault on server
-    if not api_update_vault(token, new_vault):
+    if not api_update_vault(token, new_vault_str):
         typer.echo("Failed to update vault on server.")
         raise typer.Exit(code=1)
 
