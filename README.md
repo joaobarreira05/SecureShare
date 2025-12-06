@@ -119,43 +119,6 @@ The application is configured via the `.env` file.
 **Flow:** `Admin creates User` -> `Server generates OTP` -> `User receives OTP` -> `User activates account with OTP` -> `User sets Password & generates Key Pair`
 - The user's cryptographic identity is established during activation.
 
-## API Endpoints
-
-### Authentication
-- `POST /auth/login`: Authenticates a user and returns a token/session.
-- `POST /auth/logout`: Logs out the current user.
-- `POST /auth/activate`: Activates a new account using a username and OTP.
-
-### Department Management (Admin Only)
-- `POST /departments`: Creates a new department.
-- `GET /departments`: Retrieves a list of all departments.
-- `DELETE /departments/{deptId}`: Deletes a department.
-
-### User Management
-- `POST /users`: Creates a new user (Admin only).
-- `GET /users`: Retrieves all users (Admin/Security Officer).
-- `DELETE /users/{userId}`: Removes a user (Admin only).
-- `PUT /users/{userId}/role`: Updates a user's role (Security Officer/Admin).
-- `GET /users/{userId}/clearance`: Gets clearance tokens (Security Officer/Auth User).
-- `PUT /users/{userId}/clearance`: Adds a clearance token (Security Officer).
-- `PUT /users/{userId}/revoke/{tokenId}`: Revokes a token (Security Officer).
-- `GET /users/{userId}/key`: Retrieves a user's **public** key.
-- `PUT /users/me/vault`: Uploads/updates the **encrypted private key**.
-- `GET /users/me/vault`: Retrieves the **encrypted private key**.
-- `GET /user/me/info`: Get current user info.
-- `POST /user/me/info`: Update user info.
-
-### File Transfers
-- `GET /transfers`: Lists existing transfers.
-- `POST /transfers`: Uploads an encrypted file and metadata.
-- `GET /transfers/{transferId}`: Retrieves transfer metadata and encrypted keys.
-- `DELETE /transfers/{transferId}`: Deletes a transfer.
-- `GET /transfers/download/{transfer_id}`: Downloads the raw encrypted file blob.
-
-### Audit
-- `GET /audit/log`: Retrieves the audit log (Auditor only).
-- `PUT /audit/validate`: Adds a validation to the log (Auditor only).
-
 ## CLI Command Reference
 
 ### Authentication
