@@ -36,7 +36,7 @@ Mostra informação do utilizador atual (ID, username, email, etc.).
 ## Gestão de Utilizadores (Admin/SO)
 
 # Apagar user com confirmação
-python3 -m cli.main users delete user3
+python3 -m cli.main users delete eliminado 
 
 # Apagar sem confirmação
 python3 -m cli.main users delete user3 --force
@@ -69,7 +69,7 @@ python3 -m cli.main users assign-role <USERNAME> --role <ROLE>
 
 python3 -m cli.main users assign-role user1 --role SECURITY_OFFICER
 
-python3 -m cli.main users assign-role user2 --role TRUSTED_OFFICER
+python3 -m cli.main users assign-role user1 --role TRUSTED_OFFICER
 ```
 Atribui um role a um utilizador (requer Admin ou SO).
 Roles: ADMINISTRATOR, SECURITY_OFFICER, TRUSTED_OFFICER, AUDITOR, STANDARD_USER
@@ -78,8 +78,12 @@ Roles: ADMINISTRATOR, SECURITY_OFFICER, TRUSTED_OFFICER, AUDITOR, STANDARD_USER
 python3 -m cli.main users assign-clearance <USERNAME> --level <LEVEL> --dept <DEPT>
 
 python3 -m cli.main users assign-clearance user2 --level SECRET --dept Engineering --dept HR
-python3 -m cli.main users assign-clearance user3 --level CONFIDENTIAL --dept HR 
-python3 -m cli.main users assign-clearance user3 --level SECRET --dept Engineering  
+python3 -m cli.main users assign-clearance user3 --level CONFIDENTIAL --dept HR
+
+python3 -m cli.main users assign-clearance user2 --level UNCLASSIFIED
+
+
+python3 -m cli.main users assign-clearance user2 --level TOP_SECRET --dept Engineering
 ```
 Atribui clearance MLS a um utilizador (requer SO).
 Níveis: TOP_SECRET, SECRET, CONFIDENTIAL, UNCLASSIFIED
@@ -88,18 +92,33 @@ Níveis: TOP_SECRET, SECRET, CONFIDENTIAL, UNCLASSIFIED
 
 ## Transferências
 
+echo "teste 1" > temp/tempteste1.txt
+echo "teste 2" > temp/tempteste2.txt
+echo "teste 3" > temp/tempteste3.txt
+
 ```bash
 python3 -m cli.main transfers upload <FILEPATH> --to <USER_ID> --level <LEVEL> --dept <DEPT>
+
+python3 -m cli.main transfers upload temp/tempteste1.txt --to 1 --level SECRET --dept Engineering --justification "incident response"
+
+python3 -m cli.main transfers upload tmp/testfile2.txt --to 1 --level UNCLASSIFIED --justification "incident response"
+
+python3 -m cli.main transfers download  895f91ad-a8e2-4ff5-9fc0-ad5f907de835 --justification "incident response"
+
+python3 -m cli.main transfers download 0c3c1a8b-4811-4f36-92d4-1268665f34e7
 ```
 Upload E2EE de um ficheiro para destinatário(s) específico(s).
 
 ```bash
-python3 -m cli.main transfers upload <FILEPATH> --public
+python3 -m cli.main transfers upload temp/tempteste2.txt --public
 ```
 Upload público com link + chave no fragmento.
 
 ```bash
 python3 -m cli.main transfers download <TRANSFER_ID> [--output <PATH>]
+
+python3 -m cli.main transfers download 5b886542-d246-48dc-bf05-ab21852bef37
+
 ```
 Download E2EE de um ficheiro. Requer clearance adequada.
 

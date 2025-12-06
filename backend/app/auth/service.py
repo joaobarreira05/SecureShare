@@ -335,7 +335,12 @@ async def get_current_clearance(
         if str(sub) != str(current_user.id):
              raise HTTPException(status_code=403, detail="MLS Token does not belong to user")
 
-        # 5. Check Revocation
+        # 5. Check Expiration (epoch seconds)
+        now_ts = datetime.utcnow().timestamp()
+        if exp < now_ts:
+            raise HTTPException(status_code=401, detail="MLS Token has expired")
+
+        # 6. Check Revocation
         revoked = session.get(JWTRevocationToken, (jti, "MLS"))
         if revoked:
             raise HTTPException(status_code=403, detail="MLS Token has been revoked")
