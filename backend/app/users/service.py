@@ -30,7 +30,8 @@ async def delete_user(session: Session, user_id: int):
     db_user = session.get(User, user_id)
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+    if db_user.is_admin:
+        raise HTTPException(status_code=403, detail="Administrators cannot be deleted")
     # Delete Auth Tokens
     statement_auth = select(JWTAuthToken).where(JWTAuthToken.user_id == user_id)
     auth_tokens = session.exec(statement_auth).all()
@@ -129,6 +130,10 @@ async def verify_and_store_role_token(session: Session, signed_jwt: str):
         raise HTTPException(status_code=403, detail="Issuer does not have authority to assign roles")
 
     target_role = app_role
+    
+    # Nobody can assign ADMIN role
+    if target_role == Role.ADMINISTRATOR:
+        raise HTTPException(status_code=403, detail="The ADMINISTRATOR role cannot be assigned via token.")
     # Admin -> Security Officer
     if target_role == Role.SECURITY_OFFICER and issuer_role != Role.ADMINISTRATOR:
          raise HTTPException(status_code=403, detail="Only Administrators can appoint Security Officers")

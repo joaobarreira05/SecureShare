@@ -214,8 +214,6 @@ async def check_if_trusted_officer(
     session: Session = Depends(get_session),
     x_role_token: Annotated[str | None, Header()] = None
 ):
-    if current_user.is_admin:
-        return current_user
 
     if not x_role_token:
         raise HTTPException(
