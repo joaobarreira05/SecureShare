@@ -303,7 +303,7 @@ def assign_role(
     # Security Officer → TRUSTED_OFFICER
     if role == "TRUSTED_OFFICER":
         if not is_security_officer:
-            typer.echo("Only Security Officers can assign the TRUSTED_OFFICER role.")
+            typer.echo("Only Security Officers can assign the TRUSTED_OFFICER role. Check users role in case you havent activated a role.")
             raise typer.Exit(code=1)
     elif role in ["SECURITY_OFFICER", "AUDITOR"]:
         if not is_admin:
@@ -413,9 +413,9 @@ def assign_clearance(
     try:
         private_key = load_private_key_from_vault()
         private_key_pem = private_key.private_bytes(
-            encoding=__import__('cryptography.hazmat.primitives.serialization', fromlist=['Encoding']).Encoding.PEM,
-            format=__import__('cryptography.hazmat.primitives.serialization', fromlist=['PrivateFormat']).PrivateFormat.PKCS8,
-            encryption_algorithm=__import__('cryptography.hazmat.primitives.serialization', fromlist=['NoEncryption']).NoEncryption()
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
         )
     except Exception as e:
         typer.echo(f"Failed to load private key: {e}")
@@ -649,8 +649,6 @@ def revoke_clearance(
         raise typer.Exit(code=1)
 
     # Create revocation data
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.asymmetric import padding
     
     now = datetime.now(timezone.utc)
     timestamp_str = now.strftime("%Y-%m-%dT%H:%M:%S")  # Format for JSON

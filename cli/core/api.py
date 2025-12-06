@@ -298,7 +298,7 @@ def api_get_transfer(
     try:
         resp = requests.get(url, headers=headers, verify=_get_verify(), timeout=10)
         if resp.status_code != 200:
-            print(f"DEBUG: Transfer GET failed: {resp.status_code} - {resp.text}")
+            print(f"SERVER SAID: {resp.status_code} - {resp.text}")
             return None
         return resp.json()
     except Exception as e:

@@ -3,6 +3,7 @@ from .database import engine
 from .settings import settings
 from ..models.User import User
 from ..auth.service import get_password_hash
+from .crypto import generate_rsa_keypair, encrypt_private_key_with_password
 
 def init_db():
     with Session(engine) as session:
@@ -17,7 +18,6 @@ def init_db():
             
             # Generate Admin Keys
             print("Generating Admin RSA Keys (4096 bits)...")
-            from .crypto import generate_rsa_keypair, encrypt_private_key_with_password
             
             private_pem, public_pem = generate_rsa_keypair()
             encrypted_private_key = encrypt_private_key_with_password(

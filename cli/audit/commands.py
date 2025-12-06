@@ -1,7 +1,12 @@
 import typer
+import base64
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+
 from cli.core.session import load_token, load_rbac_token
 from cli.core.api import api_get_audit_logs, api_validate_audit_log
 from cli.core.rbac import decode_rbac_token
+from cli.core.crypto import load_private_key_from_vault
 
 app = typer.Typer(help="Audit management commands (Auditor only).")
 
@@ -52,10 +57,7 @@ def get_log():
         typer.echo(f"{lid:<5} {ts:<20} {actor:<5} {action:<20} {details:<30} {is_signed:<10}")
 
 
-import base64
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
-from cli.core.crypto import load_private_key_from_vault
+
 
 @app.command("validate")
 def validate_log(

@@ -10,6 +10,7 @@ from sqlmodel import Session, select
 
 from ..models.Transfer import Transfer, TransferKey, SecurityLevel
 from ..models.User import User
+from ..models.Department import Department
 from .dependencies import check_mls_write, check_mls_read
 
 STORAGE_DIR = "storage"
@@ -35,6 +36,19 @@ def create_transfer_service(
             raise ValueError
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid departments format. Must be a JSON list of strings.")
+
+    # Validate departments exist
+    if dept_list:
+        statement = select(Department.name).where(Department.name.in_(dept_list))
+        existing_depts = db.exec(statement).all()
+        existing_depts_set = set(existing_depts)
+        
+        missing_depts = [d for d in dept_list if d not in existing_depts_set]
+        if missing_depts:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid departments: {', '.join(missing_depts)}"
+            )
 
     # 1. MLS Write Check - SKIP for public transfers
     if not is_public:

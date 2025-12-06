@@ -1,14 +1,12 @@
-# cli/auth/commands.py
 import getpass
 import re
-
 import typer
 import json
-
 
 from cli.core.session import save_token, load_token, clear_token, is_logged_in
 from cli.core.api import api_login, api_logout, api_get_vault, api_activate
 from cli.core.crypto import generate_rsa_keypair, encrypt_private_key_with_password
+from cli.core.utils import validate_password
 
 
 app = typer.Typer(help="Authentication commands (login, logout)")
@@ -25,7 +23,7 @@ def login(
     """
     # Check if session is already active
     if is_logged_in():
-        typer.echo("Session already active. Logout first.")
+        typer.echo("Session already active. Logout first to remove current session token.")
         raise typer.Exit(code=1)
 
     if username is None:
@@ -65,7 +63,7 @@ def logout():
         if api_logout(token):
             typer.echo("Logged out from backend.")
         else:
-            typer.echo("Warning: Failed to logout from backend.")
+            typer.echo("Warning: Failed to logout from backend. The token may have had already expired.")
     
     clear_token()
     typer.echo("Session ended.")
@@ -101,7 +99,6 @@ def activate():
         typer.echo("Passwords do not match.")
         raise typer.Exit(code=1)
 
-    from cli.core.utils import validate_password
     if not validate_password(password):
         raise typer.Exit(code=1)
 

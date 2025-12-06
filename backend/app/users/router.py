@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 import http
-from sqlmodel import Session, SQLModel
+from sqlmodel import Session, SQLModel, select
 from ..core.database import get_session
 from ..audit.service import log_event
-from ..models.User import VaultContent, VaultUpdate, UserCreate, UserResponse
+from ..models.User import VaultContent, VaultUpdate, UserCreate, UserResponse, User, UserClearanceResponse
 from ..models.JWTRevocationToken import JWTRevocationToken
-from .service import create_user, get_all_users
-from ..auth.service import get_current_active_admin, get_current_user, check_if_admin_or_security_officer, check_if_security_officer
-from ..models.User import User
-from .service import delete_user, update_vault
+from ..models.JWTRBACToken import JWTRBACToken
+from ..models.JWTMLSToken import JWTMLSToken
+from .service import create_user, get_all_users, delete_user, update_vault, verify_and_store_role_token, verify_and_store_revocation_token, verify_and_store_mls_token
+from ..auth.service import get_current_active_admin, get_current_user, check_if_admin_or_security_officer, check_if_security_officer, verify_rbac_token_signature
+from ..models.Role import Role
 router = APIRouter(prefix="/users", tags=["users"])
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -77,9 +78,6 @@ async def update_user_vault(
     await update_vault(session, current_user, vault)
     return None
 
-from ..models.JWTRBACToken import JWTRBACToken
-from ..models.JWTRevocationToken import JWTRevocationToken
-from .service import verify_and_store_role_token, verify_and_store_revocation_token
 
 
 class TokenCreate(SQLModel):
@@ -109,7 +107,8 @@ async def update_user_role(
         action = f"PUT /users/{user_id}/role {status.HTTP_400_BAD_REQUEST} - Token issuer does not match caller ID"
         log_event(session, current_user.id, action)
         raise HTTPException(status_code=400, detail="Token issuer does not match caller ID")
-
+    action = f"PUT /users/{user_id}/role {status.HTTP_204_NO_CONTENT} - {http.HTTPStatus(status.HTTP_204_NO_CONTENT).phrase}"    
+    log_event(session, current_user.id, action)
     return None
 
 @router.put("/{user_id}/revoke/{token_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -172,11 +171,6 @@ async def get_user_public_key(
     log_event(session, current_user.id, action)
     return {"public_key": user.public_key}
 
-from ..models.JWTMLSToken import JWTMLSToken
-from ..models.User import UserClearanceResponse
-from .service import verify_and_store_mls_token
-from sqlmodel import select
-from fastapi import Request
 
 @router.get("/{user_id}/clearance", response_model=UserClearanceResponse)
 async def get_user_clearance(
@@ -201,8 +195,7 @@ async def get_user_clearance(
             # But check_if_security_officer does it all.
             # We can't easily call it here without mocking dependencies.
             # So we replicate the check:
-            from ..auth.service import verify_rbac_token_signature
-            from ..models.Role import Role
+
             
             # Now verify_rbac_token_signature takes the raw string directly!
             payload = verify_rbac_token_signature(session, x_role_token)
