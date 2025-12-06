@@ -189,7 +189,7 @@ def upload(
         )
         
         if transfer_id:
-            typer.echo("Transfer sent successfully! 🚀")
+            typer.echo("Transfer sent successfully!")
             typer.echo(f"ID: {transfer_id}")
             if public:
                 key_b64 = base64.urlsafe_b64encode(file_key).decode("utf-8")
@@ -318,7 +318,7 @@ def download(
         raise typer.Exit(code=1)
 
     out_path.write_bytes(plaintext)
-    typer.echo(f"File saved to: {out_path} 🗸")
+    typer.echo(f"File saved to: {out_path}")
 
 
 @app.command("list")
@@ -383,7 +383,7 @@ def delete_transfer(
     mls_token = load_mls_token()
     ok = api_delete_transfer(token, transfer_id, mls_token=mls_token)
     if ok:
-        typer.echo(f"Transfer '{transfer_id}' deleted successfully. 🗑️")
+        typer.echo(f"Transfer '{transfer_id}' deleted successfully.")
     else:
         typer.echo("Failed to delete transfer (API error or permissions).")
         raise typer.Exit(code=1)

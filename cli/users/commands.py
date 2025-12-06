@@ -96,7 +96,7 @@ def delete_user(
             raise typer.Exit(code=0)
 
     if api_delete_user(token, user_id):
-        typer.echo(f"User '{username}' deleted successfully! 🗑️")
+        typer.echo(f"User '{username}' deleted successfully!")
     else:
         typer.echo("Failed to delete user. Check if you have Admin permissions.")
         raise typer.Exit(code=1)
@@ -197,7 +197,7 @@ def select_clearance():
         raise typer.Exit(code=1)
 
     save_mls_token(selected)
-    typer.echo("Active clearance updated successfully! 🛡️")
+    typer.echo("Active clearance updated successfully!")
 
 
 @app.command("role")
@@ -258,7 +258,7 @@ def select_role():
         raise typer.Exit(code=1)
 
     save_rbac_token(selected)
-    typer.echo("Active role updated successfully! 🔑")
+    typer.echo("Active role updated successfully!")
 
 
 @app.command("assign-role")
@@ -349,7 +349,7 @@ def assign_role(
 
     # Send to backend
     if api_assign_role(token, subject_id, signed_jwt, my_rbac_token):
-        typer.echo(f"Role '{role}' assigned to '{target_username}' successfully! 🗸")
+        typer.echo(f"Role '{role}' assigned to '{target_username}' successfully!")
     else:
         typer.echo("Failed to assign role. Check if you have permissions (Admin or Security Officer).")
         raise typer.Exit(code=1)
@@ -432,7 +432,7 @@ def assign_clearance(
     # Send to backend
     if api_assign_clearance(token, subject_id, signed_jwt, my_rbac_token):
         dept_str = ", ".join(departments) if departments else "(none)"
-        typer.echo(f"Clearance '{level}' assigned to '{target_username}' successfully! 🗸")
+        typer.echo(f"Clearance '{level}' assigned to '{target_username}' successfully!")
         typer.echo(f"Departments: {dept_str}")
     else:
         typer.echo("Failed to assign clearance. Check if you have Security Officer permissions.")
@@ -547,7 +547,7 @@ def revoke_role(
 
     # Send to backend
     if api_revoke_token(token, user_id, token_jti, revocation_data, my_rbac_token):
-        typer.echo(f"TRUSTED_OFFICER role revoked successfully! 🗑️")
+        typer.echo(f"TRUSTED_OFFICER role revoked successfully!")
     else:
         typer.echo("Failed to revoke token. Check permissions.")
         raise typer.Exit(code=1)
@@ -670,7 +670,7 @@ def revoke_clearance(
 
     # Send to backend
     if api_revoke_token(token, user_id, token_jti, revocation_data, my_rbac_token):
-        typer.echo(f"MLS clearance revoked successfully! 🗑️")
+        typer.echo(f"MLS clearance revoked successfully!")
     else:
         typer.echo("Failed to revoke clearance. Check permissions.")
         raise typer.Exit(code=1)

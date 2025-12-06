@@ -27,13 +27,13 @@ def me():
         typer.echo("Failed to get user information.")
         raise typer.Exit(code=1)
 
-    typer.echo("\n👤 User Information:")
+    typer.echo("\nUser Information:")
     typer.echo(f"   ID:       {info.get('id', '-')}")
     typer.echo(f"   Username: {info.get('username', '-')}")
     typer.echo(f"   Email:    {info.get('email', '-')}")
     typer.echo(f"   Name:     {info.get('full_name', '-')}")
-    typer.echo(f"   Active:   {'🗸' if info.get('is_active') else '☓'}")
-    typer.echo(f"   Admin:    {'🗸' if info.get('is_admin') else '☓'}")
+    typer.echo(f"   Active:   {'Yes' if info.get('is_active') else 'No'}")
+    typer.echo(f"   Admin:    {'Yes' if info.get('is_admin') else 'No'}")
 
 
 @app.command("update-password")
@@ -90,7 +90,7 @@ def update_password():
 
     # 6) Update password on server
     if api_update_my_info(token, {"password": new_password}):
-        typer.echo("Password changed successfully! 🔐")
+        typer.echo("Password changed successfully!")
     else:
         typer.echo("Warning: Vault updated but password change failed.")
         raise typer.Exit(code=1)

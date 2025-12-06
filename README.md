@@ -55,14 +55,29 @@ The project is organized as follows:
     ```
     *The backend will be available at `https://localhost:8000` (via Nginx/TLS if configured) or `http://localhost:8000` depending on your Docker setup.*
 
-4.  **CLI Setup (Client)**
-    To interact with the system, set up the Python CLI tool in a virtual environment.
+4.  **Access the CLI (Docker)**
+    The environment includes 3 pre-configured CLI containers. Open separate terminals to simulate different users:
+    ```bash
+    # Terminal 1
+    docker compose exec cli-1 bash
+
+    # Terminal 2
+    docker compose exec cli-2 bash
+
+    # Terminal 3
+    docker compose exec cli-3 bash
+    ```
+    ```
+    *Inside the container, you can use the alias `ss` instead of `python3 -m cli.main`. For example: `ss --help`.*
+
+5.  **Alternative: Local CLI Setup**
+    If you prefer to run the CLI locally (outside Docker):
     ```bash
     python3 -m venv venv
     source venv/bin/activate
     pip install -r requirements.txt
     
-    # Verify installatio    # Run CLI
+    # Run CLI
     python3 -m cli.main --help
     ```
 
@@ -75,16 +90,7 @@ If no current certs/ folder is present (by default, when cloning they will be), 
 ```
 This script creates a Certificate Authority (CA) and issues a certificate for `localhost` and `secureshare` (internal Docker DNS). The certificates are stored in the `certs/` directory and mounted into the containers.
 
-### Running Multiple CLIs (Docker)
-For testing multi-user scenarios, the Docker Compose setup includes three pre-configured CLI containers (`cli-1`, `cli-2`, `cli-3`). These containers have the CA certificate installed and are ready to connect to the backend.
 
-To access a CLI container:
-```bash
-docker compose exec cli-1 bash
-# Inside the container:
-python3 -m cli.main --help
-```
-You can open multiple terminal tabs and access `cli-2` and `cli-3` simultaneously to simulate different users interacting with the system.
 
 ## Configuration
 

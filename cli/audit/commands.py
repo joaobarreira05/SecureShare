@@ -128,7 +128,7 @@ def validate_log(
     # 5. Send to backend
     result = api_validate_audit_log(token, log_id, signature_b64, rbac_token)
     if result:
-        typer.echo(f"Validation entry created successfully for Log ID {log_id}! 🗸")
+        typer.echo(f"Validation entry created successfully for Log ID {log_id}!")
     else:
         typer.echo("Failed to validate log entry. Check if ID exists or permissions.")
         raise typer.Exit(code=1)
