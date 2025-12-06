@@ -25,7 +25,7 @@ def create_rbac_payload(
     issuer_id: int,
     subject_id: int,
     role: str,
-    expiration_days: int = 365
+    expiration_days: int = 7
 ) -> dict:
     """
     Creates an RBAC token payload.

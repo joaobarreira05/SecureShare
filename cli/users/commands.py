@@ -13,7 +13,7 @@ from cli.core.mls import create_mls_payload, sign_mls_token, VALID_LEVELS
 from cli.core.crypto import load_private_key_from_vault
 
 
-app = typer.Typer(help="Comandos de gestão de utilizadores (create, list, etc.)")
+app = typer.Typer(help="User management commands (create, list, etc.)")
 
 USERNAME_REGEX = re.compile(r"^[a-zA-Z0-9_.-]{3,64}$")
 EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
@@ -22,32 +22,32 @@ EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
 @app.command("create")
 def create_user():
     """
-    Cria um novo utilizador (Admin only).
-    Pede: username, otp, email, full_name.
+    Creates a new user (Admin only).
+    Prompts for: username, otp, email, full_name.
     """
     token = load_token()
     if not token:
-        typer.echo("Não tens sessão ativa. Faz primeiro `secureshare auth login` como Admin.")
+        typer.echo("No active session. Please run `secureshare auth login` as Admin first.")
         raise typer.Exit(code=1)
 
     username = typer.prompt("Username")
     if not USERNAME_REGEX.match(username):
-        typer.echo("Username inválido.")
+        typer.echo("Invalid username.")
         raise typer.Exit(code=1)
 
     otp = typer.prompt("OTP (One Time Password)")
     if not otp.strip():
-        typer.echo("OTP não pode ser vazio.")
+        typer.echo("OTP cannot be empty.")
         raise typer.Exit(code=1)
 
     email = typer.prompt("Email")
     if not EMAIL_REGEX.match(email):
-        typer.echo("Email inválido.")
+        typer.echo("Invalid email.")
         raise typer.Exit(code=1)
 
-    full_name = typer.prompt("Nome Completo")
+    full_name = typer.prompt("Full Name")
     if not full_name.strip():
-        typer.echo("Nome não pode ser vazio.")
+        typer.echo("Name cannot be empty.")
         raise typer.Exit(code=1)
 
     user_data = {
@@ -58,71 +58,71 @@ def create_user():
     }
 
     if api_create_user(token, user_data):
-        typer.echo(f"Utilizador '{username}' criado com sucesso!")
+        typer.echo(f"User '{username}' created successfully!")
     else:
-        typer.echo("Falha ao criar utilizador. Verifica se tens permissões de Admin ou se o user já existe.")
+        typer.echo("Failed to create user. Check if you have Admin permissions or if the user already exists.")
         raise typer.Exit(code=1)
 
 
 @app.command("delete")
 def delete_user(
-    username: str = typer.Argument(..., help="Username do utilizador a apagar"),
-    force: bool = typer.Option(False, "--force", "-f", help="Apagar sem confirmação"),
+    username: str = typer.Argument(..., help="Username of the user to delete"),
+    force: bool = typer.Option(False, "--force", "-f", help="Delete without confirmation"),
 ):
     """
-    Apaga um utilizador (Admin only).
+    Deletes a user (Admin only).
     """
     token = load_token()
     if not token:
-        typer.echo("Não tens sessão ativa. Faz primeiro login.")
+        typer.echo("No active session. Please login first.")
         raise typer.Exit(code=1)
 
     # Obter RBAC token para aceder à lista de users
     rbac_token = load_rbac_token()
 
-    # Obter info do user a apagar
+    # Get info of the user to delete
     target_user = api_get_user_by_username(token, username, rbac_token)
     if not target_user:
-        typer.echo(f"Utilizador '{username}' não encontrado.")
+        typer.echo(f"User '{username}' not found.")
         raise typer.Exit(code=1)
 
     user_id = target_user.get("id")
     
-    # Confirmação
+    # Confirmation
     if not force:
-        confirm = typer.confirm(f"Tens a certeza que queres apagar o utilizador '{username}' (ID: {user_id})?")
+        confirm = typer.confirm(f"Are you sure you want to delete user '{username}' (ID: {user_id})?")
         if not confirm:
-            typer.echo("Operação cancelada.")
+            typer.echo("Operation cancelled.")
             raise typer.Exit(code=0)
 
     if api_delete_user(token, user_id):
-        typer.echo(f"Utilizador '{username}' apagado com sucesso! 🗑️")
+        typer.echo(f"User '{username}' deleted successfully! 🗑️")
     else:
-        typer.echo("Falha ao apagar utilizador. Verifica se tens permissões de Admin.")
+        typer.echo("Failed to delete user. Check if you have Admin permissions.")
         raise typer.Exit(code=1)
 
 
 @app.command("list")
 def list_users():
     """
-    Lista todos os utilizadores (Admin ou Security Officer).
+    Lists all users (Admin or Security Officer).
     """
     token = load_token()
     if not token:
-        typer.echo("Não tens sessão ativa. Faz primeiro login.")
+        typer.echo("No active session. Please login first.")
         raise typer.Exit(code=1)
 
-    # Obter RBAC token se existir
+    # Get RBAC token if exists
     rbac_token = load_rbac_token()
     
     users = api_get_all_users(token, rbac_token)
     
     if not users:
-        typer.echo("Nenhum utilizador encontrado ou sem permissões.")
+        typer.echo("No users found or insufficient permissions.")
         return
 
     if not users:
-        typer.echo("Nenhum utilizador encontrado.")
+        typer.echo("No users found.")
         return
 
     typer.echo(f"\n{'ID':<5} {'Username':<20} {'Email':<30} {'Ativo':<6} {'Admin':<6}")
@@ -136,37 +136,37 @@ def list_users():
 @app.command("clearance")
 def select_clearance():
     """
-    Lista e seleciona uma clearance (MLS Token) ativa.
+    Lists and selects an active clearance (MLS Token).
     """
     token = load_token()
     if not token:
-        typer.echo("Não tens sessão ativa. Faz primeiro `secureshare auth login`.")
+        typer.echo("No active session. Please run `secureshare auth login` first.")
         raise typer.Exit(code=1)
 
-    # Obter info do user para saber o ID
+    # Get user info to know the ID
     my_info = api_get_my_info(token)
     if not my_info:
-        typer.echo("Falha ao obter informação do utilizador.")
+        typer.echo("Failed to get user information.")
         raise typer.Exit(code=1)
     
     user_id = my_info.get("id")
     if not user_id:
-        typer.echo("Falha ao obter ID do utilizador.")
+        typer.echo("Failed to get user ID.")
         raise typer.Exit(code=1)
 
     clearances_response = api_get_user_clearances(token, user_id)
     if clearances_response is None:
-        typer.echo("Falha ao obter clearances.")
+        typer.echo("Failed to get clearances.")
         raise typer.Exit(code=1)
 
     # Response has mls_tokens and rbac_tokens
     mls_tokens = clearances_response.get("mls_tokens", [])
     
     if not mls_tokens:
-        typer.echo("Não tens clearances MLS atribuídas.")
+        typer.echo("You have no MLS clearances assigned.")
         return
 
-    typer.echo("Clearances MLS disponíveis:")
+    typer.echo("Available MLS Clearances:")
     valid_tokens = []
     for idx, token_obj in enumerate(mls_tokens):
         try:
@@ -180,55 +180,55 @@ def select_clearance():
             depts = payload.get("departments", [])
             exp = payload.get("exp", "N/A")
             
-            typer.echo(f"{idx + 1}) Nível: {lvl} | Depts: {depts} | Expira: {exp}")
+            typer.echo(f"{idx + 1}) Level: {lvl} | Depts: {depts} | Expires: {exp}")
             valid_tokens.append(jwt_token)
         except Exception:
-            typer.echo(f"{idx + 1}) [Token Inválido/Corrompido]")
+            typer.echo(f"{idx + 1}) [Invalid/Corrupted Token]")
             valid_tokens.append(None)
 
-    choice = typer.prompt("Escolhe uma clearance (número)", type=int)
+    choice = typer.prompt("Choose a clearance (number)", type=int)
     if choice < 1 or choice > len(valid_tokens):
-        typer.echo("Opção inválida.")
+        typer.echo("Invalid option.")
         raise typer.Exit(code=1)
 
     selected = valid_tokens[choice - 1]
     if not selected:
-        typer.echo("Token inválido selecionado.")
+        typer.echo("Invalid token selected.")
         raise typer.Exit(code=1)
 
     save_mls_token(selected)
-    typer.echo("Clearance ativa atualizada com sucesso! 🛡️")
+    typer.echo("Active clearance updated successfully! 🛡️")
 
 
 @app.command("role")
 def select_role():
     """
-    Lista e seleciona um RBAC Token (Role) ativo.
+    Lists and selects an active RBAC Token (Role).
     """
     token = load_token()
     if not token:
-        typer.echo("Não tens sessão ativa. Faz primeiro `secureshare auth login`.")
+        typer.echo("No active session. Please run `secureshare auth login` first.")
         raise typer.Exit(code=1)
 
     my_info = api_get_my_info(token)
     if not my_info:
-        typer.echo("Falha ao obter informação do utilizador.")
+        typer.echo("Failed to get user information.")
         raise typer.Exit(code=1)
     
     user_id = my_info.get("id")
 
     clearances_response = api_get_user_clearances(token, user_id)
     if clearances_response is None:
-        typer.echo("Falha ao obter roles.")
+        typer.echo("Failed to get roles.")
         raise typer.Exit(code=1)
 
     rbac_tokens = clearances_response.get("rbac_tokens", [])
     
     if not rbac_tokens:
-        typer.echo("Não tens roles RBAC atribuídos.")
+        typer.echo("You have no RBAC roles assigned.")
         return
 
-    typer.echo("Roles RBAC disponíveis:")
+    typer.echo("Available RBAC Roles:")
     valid_tokens = []
     for idx, token_obj in enumerate(rbac_tokens):
         try:
@@ -241,55 +241,55 @@ def select_role():
             exp = payload.get("exp", "N/A")
             iss = payload.get("iss", "N/A")
             
-            typer.echo(f"{idx + 1}) Role: {role} | Issuer: {iss} | Expira: {exp}")
+            typer.echo(f"{idx + 1}) Role: {role} | Issuer: {iss} | Expires: {exp}")
             valid_tokens.append(jwt_token)
         except Exception:
-            typer.echo(f"{idx + 1}) [Token Inválido/Corrompido]")
+            typer.echo(f"{idx + 1}) [Invalid/Corrupted Token]")
             valid_tokens.append(None)
 
-    choice = typer.prompt("Escolhe um role (número)", type=int)
+    choice = typer.prompt("Choose a role (number)", type=int)
     if choice < 1 or choice > len(valid_tokens):
-        typer.echo("Opção inválida.")
+        typer.echo("Invalid option.")
         raise typer.Exit(code=1)
 
     selected = valid_tokens[choice - 1]
     if not selected:
-        typer.echo("Token inválido selecionado.")
+        typer.echo("Invalid token selected.")
         raise typer.Exit(code=1)
 
     save_rbac_token(selected)
-    typer.echo("Role ativo atualizado com sucesso! 🔑")
+    typer.echo("Active role updated successfully! 🔑")
 
 
 @app.command("assign-role")
 def assign_role(
-    target_username: str = typer.Argument(..., help="Username do utilizador alvo"),
-    role: str = typer.Option(..., "--role", "-r", help=f"Role a atribuir: {', '.join(VALID_ROLES)}"),
-    expire_days: int = typer.Option(365, "--expire-days", help="Dias até expiração"),
+    target_username: str = typer.Argument(..., help="Target user's username"),
+    role: str = typer.Option(..., "--role", "-r", help=f"Role to assign: {', '.join(VALID_ROLES)}"),
+    expire_days: int = typer.Option(365, "--expire-days", "--days", help="Days until expiration"),
 ):
     """
-    Atribui um role a um utilizador.
-    Requer: Admin ou Security Officer.
+    Assigns a role to a user.
+    Requires: Admin or Security Officer.
     """
     token = load_token()
     if not token:
-        typer.echo("Não tens sessão ativa. Faz primeiro `secureshare auth login`.")
+        typer.echo("No active session. Please run `secureshare auth login` first.")
         raise typer.Exit(code=1)
 
     if role not in VALID_ROLES:
-        typer.echo(f"Role inválido. Opções: {', '.join(VALID_ROLES)}")
+        typer.echo(f"Invalid role. Options: {', '.join(VALID_ROLES)}")
         raise typer.Exit(code=1)
 
-    # Obter meu info (issuer)
+    # Get my info (issuer)
     my_info = api_get_my_info(token)
     if not my_info:
-        typer.echo("Falha ao obter informação do utilizador.")
+        typer.echo("Failed to get user information.")
         raise typer.Exit(code=1)
     
     issuer_id = my_info.get("id")
     is_admin = my_info.get("is_admin", False)
 
-    # Obter meu RBAC token (se existir)
+    # Get my RBAC token (if exists)
     my_rbac_token = load_rbac_token()
     is_security_officer = False
     
@@ -298,32 +298,32 @@ def assign_role(
         if rbac_payload and rbac_payload.get("app_role") == "SECURITY_OFFICER":
             is_security_officer = True
 
-    # Verificar permissões de atribuição de roles
-    # Admin → SECURITY_OFFICER, AUDITOR (NÃO pode dar TRUSTED_OFFICER)
+    # Verify role assignment permissions
+    # Admin → SECURITY_OFFICER, AUDITOR (CANNOT give TRUSTED_OFFICER)
     # Security Officer → TRUSTED_OFFICER
     if role == "TRUSTED_OFFICER":
         if not is_security_officer:
-            typer.echo("Apenas Security Officers podem atribuir o role TRUSTED_OFFICER.")
+            typer.echo("Only Security Officers can assign the TRUSTED_OFFICER role.")
             raise typer.Exit(code=1)
     elif role in ["SECURITY_OFFICER", "AUDITOR"]:
         if not is_admin:
-            typer.echo(f"Apenas Administradores podem atribuir o role {role}.")
+            typer.echo(f"Only Administrators can assign the {role} role.")
             raise typer.Exit(code=1)
     else:
-        # Outros roles (se existirem)
+        # Other roles (if they exist)
         if not is_admin and not is_security_officer:
-            typer.echo("Não tens permissões para atribuir roles.")
+            typer.echo("You do not have permissions to assign roles.")
             raise typer.Exit(code=1)
 
-    # Obter info do alvo
+    # Get target info
     target_user = api_get_user_by_username(token, target_username, my_rbac_token)
     if not target_user:
-        typer.echo(f"Utilizador '{target_username}' não encontrado.")
+        typer.echo(f"User '{target_username}' not found.")
         raise typer.Exit(code=1)
     
     subject_id = target_user.get("id")
 
-    # Carregar private key do vault
+    # Load private key from vault
     try:
         private_key = load_private_key_from_vault()
         # Convert to PEM bytes
@@ -334,82 +334,82 @@ def assign_role(
             encryption_algorithm=serialization.NoEncryption()
         )
     except Exception as e:
-        typer.echo(f"Falha ao carregar private key: {e}")
+        typer.echo(f"Failed to load private key: {e}")
         raise typer.Exit(code=1)
 
-    # Criar e assinar token
+    # Create and sign token
     try:
         payload = create_rbac_payload(issuer_id, subject_id, role, expire_days)
         signed_jwt = sign_rbac_token(payload, private_key_pem)
     except Exception as e:
-        typer.echo(f"Falha ao criar token: {e}")
+        typer.echo(f"Failed to create token: {e}")
         raise typer.Exit(code=1)
 
     # Enviar para backend
 
-    # Enviar para backend
+    # Send to backend
     if api_assign_role(token, subject_id, signed_jwt, my_rbac_token):
-        typer.echo(f"Role '{role}' atribuído a '{target_username}' com sucesso! 🗸")
+        typer.echo(f"Role '{role}' assigned to '{target_username}' successfully! 🗸")
     else:
-        typer.echo("Falha ao atribuir role. Verifica se tens permissões (Admin ou Security Officer).")
+        typer.echo("Failed to assign role. Check if you have permissions (Admin or Security Officer).")
         raise typer.Exit(code=1)
 
 
 @app.command("assign-clearance")
 def assign_clearance(
-    target_username: str = typer.Argument(..., help="Username do utilizador alvo"),
-    level: str = typer.Option(..., "--level", "-l", help=f"Nível de segurança: {', '.join(VALID_LEVELS)}"),
-    departments: List[str] = typer.Option([], "--dept", "-d", help="Departamentos (pode repetir)"),
-    expire_days: int = typer.Option(365, "--expire-days", help="Dias até expiração"),
+    target_username: str = typer.Argument(..., help="Target user's username"),
+    level: str = typer.Option(..., "--level", "-l", help=f"Security level: {', '.join(VALID_LEVELS)}"),
+    departments: List[str] = typer.Option([], "--dept", "-d", help="Departments (can repeat)"),
+    expire_days: int = typer.Option(365, "--expire-days", "--days", help="Days until expiration"),
 ):
     """
-    Atribui uma clearance (MLS Token) a um utilizador.
-    Requer: Security Officer com role ativo.
+    Assigns a clearance (MLS Token) to a user.
+    Requires: Security Officer with active role.
     """
     token = load_token()
     if not token:
-        typer.echo("Não tens sessão ativa. Faz primeiro login.")
+        typer.echo("No active session. Please login first.")
         raise typer.Exit(code=1)
 
-    # Validar nível
+    # Validate level
     if level not in VALID_LEVELS:
-        typer.echo(f"Nível inválido. Deve ser um de: {', '.join(VALID_LEVELS)}")
+        typer.echo(f"Invalid level. Must be one of: {', '.join(VALID_LEVELS)}")
         raise typer.Exit(code=1)
 
-    # Obter RBAC token (deve ser SO)
+    # Get RBAC token (must be SO)
     my_rbac_token = load_rbac_token()
     if not my_rbac_token:
-        typer.echo("Precisas de ter um role ativo. Usa 'users role' para selecionar.")
+        typer.echo("You need an active role. Use 'users role' to select one.")
         raise typer.Exit(code=1)
 
-    # Verificar se é Security Officer
+    # Check if Security Officer
     rbac_payload = decode_rbac_token(my_rbac_token)
     if not rbac_payload or rbac_payload.get("app_role") != "SECURITY_OFFICER":
-        typer.echo("Apenas Security Officers podem atribuir clearances.")
+        typer.echo("Only Security Officers can assign clearances.")
         raise typer.Exit(code=1)
 
-    # Obter minha info (issuer)
+    # Get my info (issuer)
     my_info = api_get_my_info(token)
     if not my_info:
-        typer.echo("Falha ao obter informação do utilizador atual.")
+        typer.echo("Failed to get current user information.")
         raise typer.Exit(code=1)
     issuer_id = my_info.get("id")
 
 
-    # Obter info do target
+    # Get target info
     target_user = api_get_user_by_username(token, target_username, my_rbac_token)
     if not target_user:
-        typer.echo(f"Utilizador '{target_username}' não encontrado.")
+        typer.echo(f"User '{target_username}' not found.")
         raise typer.Exit(code=1)
     subject_id = target_user.get("id")
 
-    # Verificar auto-atribuição: SO não pode dar clearance a si próprio
+    # Check self-assignment: SO cannot give clearance to themselves
     if subject_id == issuer_id:
-        typer.echo("Não podes atribuir clearance a ti próprio. Pede a outro Security Officer.")
+        typer.echo("You cannot assign clearance to yourself. Ask another Security Officer.")
         raise typer.Exit(code=1)
 
-    # Carregar private key
-    typer.echo("A carregar chave privada...")
+    # Load private key
+    typer.echo("Loading private key...")
     try:
         private_key = load_private_key_from_vault()
         private_key_pem = private_key.private_bytes(
@@ -418,15 +418,15 @@ def assign_clearance(
             encryption_algorithm=__import__('cryptography.hazmat.primitives.serialization', fromlist=['NoEncryption']).NoEncryption()
         )
     except Exception as e:
-        typer.echo(f"Falha ao carregar private key: {e}")
+        typer.echo(f"Failed to load private key: {e}")
         raise typer.Exit(code=1)
 
-    # Criar e assinar MLS token
+    # Create and sign MLS token
     try:
         payload = create_mls_payload(issuer_id, subject_id, level, departments, expire_days)
         signed_jwt = sign_mls_token(payload, private_key_pem)
     except Exception as e:
-        typer.echo(f"Falha ao criar token: {e}")
+        typer.echo(f"Failed to create token: {e}")
         raise typer.Exit(code=1)
 
     # Send to backend

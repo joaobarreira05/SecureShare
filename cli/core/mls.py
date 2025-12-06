@@ -29,7 +29,7 @@ def create_mls_payload(
     subject_id: int,
     level: str,
     departments: List[str],
-    expiration_days: int = 365
+    expiration_days: int = 7
 ) -> dict:
     """
     Creates an MLS (clearance) token payload.

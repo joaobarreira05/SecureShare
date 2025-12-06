@@ -76,7 +76,7 @@ def activate():
     """
     Activate an account. Only allowed if no session is active.
     """
-    # Verificar se já há sessão ativa
+    # Check if session is already active
     if is_logged_in():
         typer.echo("Session already active. Logout first.")
         raise typer.Exit(code=1)
@@ -105,13 +105,13 @@ def activate():
     if not validate_password(password):
         raise typer.Exit(code=1)
 
-    # Gerar chaves RSA
+    # Generate RSA keys
     private_pem, public_pem = generate_rsa_keypair()
 
-    # Criar vault (private key encriptada com password)
+    # Create vault (private key encrypted with password)
     vault_obj = encrypt_private_key_with_password(private_pem, password)
 
-    # Preparar dados para o backend
+    # Prepare data for backend
     
     activation_data = {
         "username": username,
@@ -121,7 +121,7 @@ def activate():
         "encrypted_private_key": json.dumps(vault_obj)
     }
 
-    # Chamar API
+    # Call API
     if not api_activate(activation_data):
         typer.echo("Activation failed. Check OTP and username.")
         raise typer.Exit(code=1)
