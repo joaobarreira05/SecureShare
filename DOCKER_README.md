@@ -17,6 +17,32 @@ To run the container and map port 8000 (HTTPS):
 docker run -p 8000:8000 --env-file .env secureshare
 ```
 
+## Multi-Container CLI Setup
+We provide 3 pre-configured CLI containers (`cli-1`, `cli-2`, `cli-3`) that are ready to connect to the backend.
+
+1.  **Start the environment**:
+    ```bash
+    docker-compose up -d --build
+    ```
+
+2.  **Access a CLI container**:
+    You can open a shell in any of the CLI containers to act as different users.
+    ```bash
+    # Terminal 1 (User A)
+    docker exec -it project-2-secureshare-119792_119876_120054-cli-1-1 /bin/bash
+    
+    # Terminal 2 (User B)
+    docker exec -it project-2-secureshare-119792_119876_120054-cli-2-1 /bin/bash
+    ```
+    *(Note: The container names might vary slightly depending on your folder name. Use `docker ps` to check)*
+
+3.  **Run CLI commands**:
+    Inside the container, run commands using the python module syntax:
+    ```bash
+    python3 -m cli.main auth login
+    python3 -m cli.main users list
+    ```
+
 ## Run with Persistent Database
 If you want the SQLite database to persist between container restarts, mount a volume for the `data` directory (or wherever the db is stored, usually root or a specific folder):
 

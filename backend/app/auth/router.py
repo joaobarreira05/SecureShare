@@ -52,10 +52,13 @@ async def login(login_data: LoginRequest, session: Session = Depends(get_session
 
 
 @router.post("/logout")
-async def logout(current_user: Annotated[User, Depends(get_current_user)]):
+async def logout(
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Session = Depends(get_session)
+):
     """
     Logout the current user.
     """
     action = f"POST /logout {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
-    log_event(session, user.id, action, "Logged out successfully")
+    log_event(session, current_user.id, action, "Logged out successfully")
     return {"message": "Logged out successfully"}

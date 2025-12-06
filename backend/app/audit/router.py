@@ -6,7 +6,7 @@ from ..core.database import get_session
 from ..auth.service import check_if_auditor
 from ..models.User import User
 from ..models.Audit import AuditLog, AuditValidationRequest
-from .service import add_log_signature
+from .service import create_validation_entry
 
 router = APIRouter(
     prefix="/audit",

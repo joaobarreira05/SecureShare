@@ -490,7 +490,6 @@ def api_delete_department(token: str, dept_id: int) -> bool:
         resp = requests.delete(url, headers=headers, verify=_get_verify(), timeout=10)
         return resp.status_code == 204
     except Exception:
-    except Exception:
         return False
 
 

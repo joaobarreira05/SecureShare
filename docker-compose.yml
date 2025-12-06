@@ -20,6 +20,39 @@ services:
       - sonarqube_extensions:/opt/sonarqube/extensions
       - sonarqube_logs:/opt/sonarqube/logs
 
+  cli-1:
+    build: .
+    command: tail -f /dev/null
+    environment:
+      - SECURESHARE_URL=https://secureshare:8000
+      - SECURESHARE_CA_CERT=/app/certs/ca.crt
+    volumes:
+      - ./certs:/app/certs
+    depends_on:
+      - secureshare
+
+  cli-2:
+    build: .
+    command: tail -f /dev/null
+    environment:
+      - SECURESHARE_URL=https://secureshare:8000
+      - SECURESHARE_CA_CERT=/app/certs/ca.crt
+    volumes:
+      - ./certs:/app/certs
+    depends_on:
+      - secureshare
+
+  cli-3:
+    build: .
+    command: tail -f /dev/null
+    environment:
+      - SECURESHARE_URL=https://secureshare:8000
+      - SECURESHARE_CA_CERT=/app/certs/ca.crt
+    volumes:
+      - ./certs:/app/certs
+    depends_on:
+      - secureshare
+
 volumes:
   sonarqube_data:
   sonarqube_extensions:
