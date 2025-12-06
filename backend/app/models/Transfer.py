@@ -3,7 +3,6 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import Column, String
 
 class SecurityLevel(str, Enum):
     TOP_SECRET = "TOP_SECRET"

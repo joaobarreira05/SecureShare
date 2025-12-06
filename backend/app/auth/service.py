@@ -1,14 +1,25 @@
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
-from fastapi import Depends, HTTPException, status
+import json
+import base64
+
+from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlmodel import Session, select
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.exceptions import InvalidSignature
+
 from ..core.database import get_session
 from ..core.settings import settings
 from ..models.User import User, UserActivate
-from ..models.JWTAuthToken import TokenPayload
+from ..models.JWTAuthToken import TokenPayload, JWTAuthToken
+from ..models.JWTRBACToken import JWTRBACToken
+from ..models.Role import Role
+from ..models.JWTRevocationToken import JWTRevocationToken
 
 # Password hashing
 pwd_context = CryptContext(
@@ -27,10 +38,10 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password + settings.PASSWORD_PEPPER, hashed_password)
 
 def get_password_hash(password):
-    print(f"DEBUG: Hashing with pepper: {settings.PASSWORD_PEPPER}")
+    #print(f"DEBUG: Hashing with pepper: {settings.PASSWORD_PEPPER}")
     return pwd_context.hash(password + settings.PASSWORD_PEPPER)
 
-from ..models.JWTAuthToken import JWTAuthToken
+
 
 def create_access_token(session: Session, user_id: int, data: dict, expires_delta: timedelta | None = None):
     # Check for existing valid token
@@ -127,17 +138,7 @@ async def activate_user_account(session: Session, activation_data: UserActivate)
     session.refresh(user)
     return user
 
-from ..models.JWTRBACToken import JWTRBACToken
-from ..models.Role import Role
-from cryptography.hazmat.backends import default_backend
 
-from fastapi import Header
-import json
-from ..models.JWTRevocationToken import JWTRevocationToken
-from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.exceptions import InvalidSignature
-import base64
 
 def verify_rbac_token_signature(session: Session, signed_jwt: str):
     # 1. Get Issuer ID from Header (safe to read before verification)

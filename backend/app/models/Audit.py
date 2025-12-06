@@ -3,7 +3,6 @@ from typing import Optional
 from sqlmodel import Field, SQLModel
 from pydantic import BaseModel
 import hashlib
-import json
 
 class AuditLog(SQLModel, table=True):
     __tablename__ = "audit_logs"

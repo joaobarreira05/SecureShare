@@ -1,5 +1,7 @@
 from sqlmodel import Field, SQLModel
 from pydantic import EmailStr
+from .JWTRBACToken import JWTRBACToken
+from .JWTMLSToken import JWTMLSToken
 
 # ==========================================
 # SQLModel (Database Entity + Base Pydantic)
@@ -62,9 +64,6 @@ class UserUpdate(SQLModel):
     full_name: str | None = None
     email: EmailStr | None = None
     password: str | None = None
-
-from .JWTRBACToken import JWTRBACToken
-from .JWTMLSToken import JWTMLSToken
 
 class UserClearanceResponse(SQLModel):
     mls_tokens: list[JWTMLSToken]

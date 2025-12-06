@@ -104,7 +104,7 @@ def upload(
             
             # No Write Down: User Level <= File Level
             if LEVEL_MAP.get(user_level, 1) > LEVEL_MAP.get(level, 1):
-                typer.echo(f"MLS Error: You cannot upload with level {level} (your level is {user_level}).")
+                typer.echo(f"MLS Error: You cannot upload with level {level} (your level is {user_level}). (No Write Down)")
                 raise typer.Exit(code=1)
 
             # *-Property: User Departments ⊆ File Departments (No Write Down)
@@ -241,7 +241,7 @@ def download(
     # 1) Get metadata
     meta = api_get_transfer(token, transfer_id, mls_token=mls_token, rbac_token=rbac_token, justification=justification)
     if not meta:
-        typer.echo("Failed to get transfer metadata.")
+        typer.echo("Failed to get transfer metadata. make sure you activated the right clearance.")
         raise typer.Exit(code=1)
 
     filename = meta.get("filename") or f"transfer_{transfer_id}"

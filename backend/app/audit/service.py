@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session
 from ..models.Audit import AuditLog
 from datetime import datetime, timezone
 from typing import Optional

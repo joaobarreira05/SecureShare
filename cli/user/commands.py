@@ -3,8 +3,11 @@
 Current user commands (view info, etc.)
 """
 import typer
+import json
 from cli.core.session import load_token
-from cli.core.api import api_get_my_info, api_update_my_info
+from cli.core.api import api_get_my_info, api_update_my_info, api_get_vault, api_update_vault
+from cli.core.crypto import decrypt_vault, encrypt_private_key_with_password
+from cli.core.utils import validate_password
 
 app = typer.Typer(help="Current user commands (info, etc.)")
 
@@ -39,8 +42,7 @@ def update_password():
     Changes the current user's password.
     Also re-encrypts the vault with the new password.
     """
-    from cli.core.api import api_get_vault, api_update_vault
-    from cli.core.crypto import decrypt_vault, encrypt_private_key_with_password
+
     
     token = load_token()
     if not token:
@@ -70,14 +72,12 @@ def update_password():
         typer.echo("Passwords do not match.")
         raise typer.Exit(code=1)
 
-    from cli.core.utils import validate_password
     if not validate_password(new_password):
         raise typer.Exit(code=1)
 
     # 4) Re-encrypt vault with new password
     try:
         new_vault = encrypt_private_key_with_password(private_key_pem, new_password)
-        import json
         new_vault_str = json.dumps(new_vault)
     except Exception as e:
         typer.echo(f"Failed to encrypt vault: {e}")

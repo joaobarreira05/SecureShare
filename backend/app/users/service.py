@@ -1,14 +1,33 @@
+from datetime import datetime
+import base64
+
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
-from ..models.User import User, UserCreate
+from jose import jwt, JWTError
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.backends import default_backend
+
+from ..models.User import User, UserCreate, VaultUpdate
 from ..auth.service import get_password_hash
 from ..models.JWTAuthToken import JWTAuthToken
+from ..models.JWTRBACToken import JWTRBACToken, RBACPayload
+from ..models.JWTRevocationToken import JWTRevocationToken
+from ..models.JWTMLSToken import JWTMLSToken
+from ..models.Role import Role
+from ..models.Department import Department
+from ..core.settings import settings
 
 async def create_user(session: Session, user: UserCreate):
     statement = select(User).where(User.username == user.username)
     db_user = session.exec(statement).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
+    
+    statement = select(User).where(User.email == user.email)
+    db_user = session.exec(statement).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
     
     # Hash the OTP provided by the admin
     hashed_otp = get_password_hash(user.otp)
@@ -54,7 +73,7 @@ async def delete_user(session: Session, user_id: int):
     session.commit()
     return True
 
-from ..models.User import VaultUpdate
+
 
 async def update_vault(session: Session, user: User, vault: VaultUpdate):
     user.encrypted_private_key = vault.encrypted_private_key
@@ -63,13 +82,7 @@ async def update_vault(session: Session, user: User, vault: VaultUpdate):
     session.refresh(user)
     return user
 
-from ..models.JWTRBACToken import JWTRBACToken, RBACPayload
-from ..models.JWTRevocationToken import JWTRevocationToken
-from ..models.Role import Role
-from ..core.settings import settings
-from jose import jwt, JWTError
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.backends import default_backend
+
 
 async def verify_and_store_role_token(session: Session, signed_jwt: str):
     # 1. Get Issuer ID from Header
@@ -162,7 +175,7 @@ async def verify_and_store_role_token(session: Session, signed_jwt: str):
     return token_data
 
 async def verify_and_store_revocation_token(session: Session, token_data: JWTRevocationToken):
-    from datetime import datetime
+
     
     # 1. Verify Issuer is Security Officer
     if token_data.token_type not in ["MLS", "RBAC"]:
@@ -188,9 +201,7 @@ async def verify_and_store_revocation_token(session: Session, token_data: JWTRev
         timestamp = datetime.fromisoformat(timestamp)
     
     # --- Signature Verification ---
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import padding
-    import base64
+
 
     # Reconstruct the signed message: token_id|revoker_id|timestamp_str
     # Timestamp format must match CLI: %Y-%m-%dT%H:%M:%S
@@ -236,8 +247,7 @@ async def get_all_users(session: Session):
     statement = select(User)
     return session.exec(statement).all()
 
-from ..models.JWTMLSToken import JWTMLSToken
-from datetime import datetime
+
 
 async def verify_and_store_mls_token(session: Session, signed_jwt: str):
     # 1. Get Issuer ID from Header
@@ -285,7 +295,7 @@ async def verify_and_store_mls_token(session: Session, signed_jwt: str):
     # 6. Validate Departments
     departments = payload.get("departments", [])
     if departments:
-        from ..models.Department import Department
+
         # Check if all departments exist
         statement = select(Department.name).where(Department.name.in_(departments))
         existing_depts = session.exec(statement).all()
