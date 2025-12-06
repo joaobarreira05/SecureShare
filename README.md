@@ -1,6 +1,86 @@
 # SecureShare
 
-SecureShare is a single-tenant secure file transfer web application designed to ensure end-to-end encryption and strict access control.
+SecureShare is a single-tenant secure file transfer web application designed to ensure end-to-end encryption and strict access control. It implements a robust security model including Role-Based Access Control (RBAC) and Multi-Level Security (MLS) with Bell-LaPadula enforcement.
+
+## Project Structure
+
+The project is organized as follows:
+
+```
+.
+├── backend/                # FastAPI Backend Application
+│   ├── app/                # Application Source Code
+│   │   ├── auth/           # Authentication Logic
+│   │   ├── audit/          # Audit Logging & Validation
+│   │   ├── core/           # Core Config & Database
+│   │   ├── departments/    # Department Management
+│   │   ├── models/         # Database Models
+│   │   ├── transfers/      # File Transfer Logic
+│   │   └── users/          # User Management
+├── cli/                    # Command Line Interface Tool
+├── certs/                  # TLS Certificates
+├── data/                   # Database Storage (SQLite)
+├── storage/                # Encrypted File Storage
+├── tests/                  # Test Suite
+├── docker-compose.yml      # Docker Orchestration
+├── setup_env.py            # Environment Setup Script
+└── requirements.txt        # Python Dependencies
+```
+
+## Setup & Run
+
+### Prerequisites
+- **Docker & Docker Compose**: For running the backend and services.
+- **Python 3.x**: Required to run the initial setup script and the CLI.
+
+### Step-by-Step Installation
+
+1.  **Clone the Repository**
+    ```bash
+    git clone <repository-url>
+    cd project-2-secureshare
+    ```
+
+2.  **Generate Environment Configuration**
+    **CRITICAL STEP**: You must run the setup script before starting the application. This script generates the `.env` file containing secure RSA keys for token signing and the password pepper.
+    ```bash
+    python3 setup_env.py
+    ```
+    *This will create a `.env` file based on `.env.example` and populate it with new cryptographic keys.*
+
+3.  **Start the Application (Docker)**
+    Build and start the backend and SonarQube services.
+    ```bash
+    docker compose up --build
+    ```
+    *The backend will be available at `https://localhost:8000` (via Nginx/TLS if configured) or `http://localhost:8000` depending on your Docker setup.*
+
+4.  **CLI Setup (Client)**
+    To interact with the system, set up the Python CLI tool in a virtual environment.
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
+    
+    # Verify installation
+    python3 -m cli.main --help
+    ```
+
+## Configuration
+
+The application is configured via the `.env` file.
+
+| Variable | Description |
+| :--- | :--- |
+| `PROJECT_NAME` | Name of the application. |
+| `DATABASE_URL` | Connection string for the database (default: SQLite). |
+| `ALGORITHM` | Algorithm used for JWT signing (e.g., `RS256`). |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Lifespan of access tokens in minutes. |
+| `ADMIN_USERNAME` | Username for the initial Administrator account. |
+| `ADMIN_PASSWORD` | Password for the initial Administrator account. |
+| `SERVER_PRIVATE_KEY` | **Critical**. RSA Private Key for signing tokens (Generated). |
+| `SERVER_PUBLIC_KEY` | RSA Public Key for verifying tokens (Generated). |
+| `PASSWORD_PEPPER` | **Critical**. Secret pepper added to passwords before hashing. |
 
 ## Use Cases / Flows
 
@@ -20,18 +100,6 @@ SecureShare is a single-tenant secure file transfer web application designed to 
 ### 4. User Creation & Activation
 **Flow:** `Admin creates User` -> `Server generates OTP` -> `User receives OTP` -> `User activates account with OTP` -> `User sets Password & generates Key Pair`
 - The user's cryptographic identity is established during activation.
-
-## Detailed Login Process
-
-The login process ensures that the server authenticates the user *without* ever accessing their private key.
-
-1.  **User Input**: The user enters their `username` and `password` in the client application.
-2.  **Authentication Request**: The client sends a `POST /auth/login` request with the credentials.
-3.  **Server Verification**: The server verifies the credentials (e.g., checking the password hash).
-4.  **Token Issuance**: If valid, the server returns an authentication token (JWT or session cookie).
-5.  **Vault Retrieval**: The client sends a `GET /users/me/vault` request (authenticated with the token) to retrieve the user's **Encrypted Private Key Blob**.
-6.  **Local Decryption**: The client uses the user's `password` (which is still in memory or re-entered) to decrypt the Private Key Blob using a strong KDF (e.g., Argon2/PBKDF2).
-7.  **Session Ready**: The plaintext Private Key is stored in the client's memory *only* for the duration of the session, allowing the user to decrypt file keys.
 
 ## API Endpoints
 

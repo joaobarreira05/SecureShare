@@ -187,6 +187,37 @@ async def verify_and_store_revocation_token(session: Session, token_data: JWTRev
     if isinstance(timestamp, str):
         timestamp = datetime.fromisoformat(timestamp)
     
+    # --- Signature Verification ---
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
+    import base64
+
+    # Reconstruct the signed message: token_id|revoker_id|timestamp_str
+    # Timestamp format must match CLI: %Y-%m-%dT%H:%M:%S
+    timestamp_str = timestamp.strftime("%Y-%m-%dT%H:%M:%S")
+    message = f"{token_data.token_id}|{token_data.revoker_id}|{timestamp_str}"
+    
+    try:
+        # Load Issuer Public Key
+        public_key = serialization.load_pem_public_key(
+            issuer_user.public_key.encode() if isinstance(issuer_user.public_key, str) else issuer_user.public_key,
+            backend=default_backend()
+        )
+        
+        # Decode Signature
+        signature_bytes = base64.b64decode(token_data.signature)
+        
+        # Verify
+        public_key.verify(
+            signature_bytes,
+            message.encode(),
+            padding.PKCS1v15(),
+            hashes.SHA256()
+        )
+    except Exception as e:
+        print(f"Signature verification failed: {e}")
+        raise HTTPException(status_code=400, detail="Invalid revocation signature")
+
     # Create a new token with proper types for SQLAlchemy
     db_token = JWTRevocationToken(
         token_id=token_data.token_id,
