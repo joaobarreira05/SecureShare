@@ -67,7 +67,9 @@ The project is organized as follows:
     ```
 
 ### Certificates (TLS)
-The application uses TLS for secure communication. You must generate the certificates before running the system.
+The application uses TLSv1.3 for secure communication. 
+
+If no current certs/ folder is present, you must generate the certificates before running the system:
 ```bash
 ./generate_certs.sh
 ```
