@@ -100,25 +100,6 @@ The application is configured via the `.env` file.
 | `SERVER_PUBLIC_KEY` | RSA Public Key for verifying tokens (Generated). |
 | `PASSWORD_PEPPER` | **Critical**. Secret pepper added to passwords before hashing. |
 
-## Use Cases / Flows
-
-### 1. User Login & Key Retrieval
-**Flow:** `User enters credentials` -> `Client authenticates with Server` -> `Client retrieves Encrypted Private Key` -> `Client decrypts Private Key locally`
-- The server never sees the plaintext private key.
-- The client uses the password to decrypt the private key blob stored on the server.
-
-### 2. File Upload (Secure Share)
-**Flow:** `User selects file` -> `Client generates random File Key` -> `Client encrypts file with File Key` -> `Client encrypts File Key with Recipient's Public Key` -> `Client uploads Encrypted File + Encrypted Keys`
-- Files are always encrypted client-side before upload.
-
-### 3. File Download
-**Flow:** `User requests file` -> `Client downloads Encrypted File + Encrypted File Key` -> `Client decrypts File Key with User's Private Key` -> `Client decrypts File with File Key`
-- Decryption happens entirely on the client side.
-
-### 4. User Creation & Activation
-**Flow:** `Admin creates User` -> `Server generates OTP` -> `User receives OTP` -> `User activates account with OTP` -> `User sets Password & generates Key Pair`
-- The user's cryptographic identity is established during activation.
-
 ## CLI Command Reference
 
 ### Authentication
