@@ -106,6 +106,11 @@ async def verify_and_store_role_token(session: Session, signed_jwt: str):
     if revoked:
         raise HTTPException(status_code=403, detail="Token has been revoked")
 
+    # Check if target user is Admin (Admins cannot have roles)
+    target_user = session.get(User, int(sub))
+    if target_user and target_user.is_admin:
+        raise HTTPException(status_code=403, detail="Administrators cannot be assigned roles")
+
     # 6. Policy Check
     issuer_role = None
     if issuer_user.is_admin:
@@ -235,6 +240,11 @@ async def verify_and_store_mls_token(session: Session, signed_jwt: str):
     revoked = session.get(JWTRevocationToken, (jti, "MLS"))
     if revoked:
         raise HTTPException(status_code=403, detail="Token has been revoked")
+
+    # Check if target user is Admin (Admins cannot have clearances)
+    target_user = session.get(User, int(sub))
+    if target_user and target_user.is_admin:
+        raise HTTPException(status_code=403, detail="Administrators cannot be assigned clearances")
 
     # 6. Validate Departments
     departments = payload.get("departments", [])

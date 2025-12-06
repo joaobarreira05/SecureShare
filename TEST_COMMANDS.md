@@ -11,7 +11,7 @@ This guide provides a step-by-step workflow to test the entire SecureShare appli
 
 ### 1. Login as Admin
 ```bash
-secureshare auth login
+ss auth login
 # Username: admin
 # Password: admin
 ```
@@ -21,7 +21,7 @@ secureshare auth login
 
 **Create Alice (Security Officer & Receiver)**
 ```bash
-secureshare users create
+ss users create
 # Username: alice
 # OTP: 123456
 # Email: alice@example.com
@@ -30,7 +30,7 @@ secureshare users create
 
 **Create Bob (Sender)**
 ```bash
-secureshare users create
+ss users create
 # Username: bob
 # OTP: 123456
 # Email: bob@example.com
@@ -39,7 +39,7 @@ secureshare users create
 
 **Create Charlie (Auditor)**
 ```bash
-secureshare users create
+ss users create
 # Username: charlie
 # OTP: 123456
 # Email: charlie@example.com
@@ -51,10 +51,10 @@ secureshare users create
 
 ```bash
 # Make Alice a Security Officer
-secureshare users assign-role alice --role SECURITY_OFFICER
+ss users assign-role alice --role SECURITY_OFFICER
 
 # Make Charlie an Auditor
-secureshare users assign-role charlie --role AUDITOR
+ss users assign-role charlie --role AUDITOR
 ```
 
 ---
@@ -64,14 +64,14 @@ secureshare users assign-role charlie --role AUDITOR
 
 ### 1. Login
 ```bash
-secureshare auth login
+ss auth login
 # Username: alice
 # Password: (password from creation step)
 ```
 
 ### 2. Select Role
 ```bash
-secureshare users role
+ss users role
 # Select: SECURITY_OFFICER
 ```
 
@@ -80,10 +80,10 @@ secureshare users role
 
 ```bash
 # Give Bob TOP_SECRET clearance in Engineering
-secureshare users assign-clearance bob --level TOP_SECRET --dept Engineering
+ss users assign-clearance bob --level TOP_SECRET --dept Engineering
 
 # Give Herself TOP_SECRET clearance (to be able to read the file later)
-secureshare users assign-clearance alice --level TOP_SECRET --dept Engineering
+ss users assign-clearance alice --level TOP_SECRET --dept Engineering
 ```
 
 ---
@@ -93,14 +93,14 @@ secureshare users assign-clearance alice --level TOP_SECRET --dept Engineering
 
 ### 1. Login
 ```bash
-secureshare auth login
+ss auth login
 # Username: bob
 # Password: (password from creation step)
 ```
 
 ### 2. Select Clearance
 ```bash
-secureshare users clearance
+ss users clearance
 # Select: TOP_SECRET
 ```
 
@@ -110,9 +110,9 @@ secureshare users clearance
 echo "The eagle has landed." > mission.txt
 
 # Upload to Alice
-secureshare transfers upload mission.txt --to <ALICE_USER_ID> --level TOP_SECRET --dept Engineering
+ss transfers upload mission.txt --to <ALICE_USER_ID> --level TOP_SECRET --dept Engineering
 ```
-*(Note: You can find Alice's ID by running `secureshare users list` in Terminal 1)*
+*(Note: You can find Alice's ID by running `ss users list` in Terminal 1)*
 **Copy the Transfer ID returned!**
 
 ---
@@ -122,17 +122,17 @@ secureshare transfers upload mission.txt --to <ALICE_USER_ID> --level TOP_SECRET
 
 ### 1. Select Clearance (if not already active)
 ```bash
-secureshare users clearance
+ss users clearance
 # Select: TOP_SECRET
 ```
 
 ### 2. List & Download
 ```bash
 # Check incoming transfers
-secureshare transfers list
+ss transfers list
 
 # Download the file
-secureshare transfers download <TRANSFER_ID>
+ss transfers download <TRANSFER_ID>
 ```
 *Verify the file content:*
 ```bash
@@ -146,26 +146,26 @@ cat mission.txt
 
 ### 1. Login as Charlie
 ```bash
-secureshare auth login
+ss auth login
 # Username: charlie
 # Password: (password from creation step)
 ```
 
 ### 2. Select Role
 ```bash
-secureshare users role
+ss users role
 # Select: AUDITOR
 ```
 
 ### 3. Audit Logs
 ```bash
 # View all logs
-secureshare audit log
+ss audit log
 ```
 
 ### 4. Validate Log
 *Pick an ID from the log list to validate.*
 ```bash
-secureshare audit validate <LOG_ID> <SIGNATURE>
+ss audit validate <LOG_ID>
 ```
-*(Note: In a real scenario, you would verify the signature externally, but here we just mark it as validated)*
+*(Note: The CLI will now automatically fetch the log, load your private key from the vault, sign the entry, and submit the validation)*

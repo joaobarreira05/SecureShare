@@ -37,7 +37,7 @@ def get_log():
         return
 
     # Print table
-    typer.echo(f"{'ID':<5} {'Timestamp':<20} {'Actor':<5} {'Action':<20} {'Details':<30} {'Signature':<10}")
+    typer.echo(f"{'ID':<5} {'Timestamp':<20} {'Actor':<5} {'Action':<20} {'Details':<30} {'Is Signed':<10}")
     typer.echo("-" * 100)
     for log in logs:
         lid = str(log.get("id", ""))
@@ -45,19 +45,21 @@ def get_log():
         actor = str(log.get("actor_id", ""))
         action = log.get("action", "")
         details = str(log.get("details", "")) or ""
-        sig = "YES" if log.get("signature") else "NO"
         
-        # Truncate details if too long
-        if len(details) > 27:
-            details = details[:27] + "..."
+        # Check if it's a validation entry or has a signature field
+        is_signed = "YES" if action == "LOG_VALIDATION" or log.get("signature") else "NO"
             
-        typer.echo(f"{lid:<5} {ts:<20} {actor:<5} {action:<20} {details:<30} {sig:<10}")
+        typer.echo(f"{lid:<5} {ts:<20} {actor:<5} {action:<20} {details:<30} {is_signed:<10}")
 
+
+import base64
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cli.core.crypto import load_private_key_from_vault
 
 @app.command("validate")
 def validate_log(
     log_id: int = typer.Argument(..., help="ID of the log entry to validate"),
-    signature: str = typer.Argument(..., help="Signature of the log entry"),
 ):
     """
     Add a validation entry to the audit log.
@@ -79,7 +81,50 @@ def validate_log(
         typer.echo("Only Auditors can validate log entries.")
         raise typer.Exit(code=1)
 
-    result = api_validate_audit_log(token, log_id, signature, rbac_token)
+    # 1. Fetch the log entry to sign
+    logs = api_get_audit_logs(token, rbac_token)
+    if not logs:
+        typer.echo("Could not retrieve logs to validate.")
+        raise typer.Exit(code=1)
+
+    target_log = next((l for l in logs if str(l.get("id")) == str(log_id)), None)
+    if not target_log:
+        typer.echo(f"Log ID {log_id} not found.")
+        raise typer.Exit(code=1)
+
+    # 2. Construct data to sign
+    # Format: ID|TIMESTAMP|ACTOR|ACTION|DETAILS
+    # We must handle None values safely
+    lid = str(target_log.get("id", ""))
+    ts = str(target_log.get("timestamp", ""))
+    actor = str(target_log.get("actor_id", ""))
+    action = str(target_log.get("action", ""))
+    details = str(target_log.get("details", "") or "")
+    
+    data_to_sign = f"{lid}|{ts}|{actor}|{action}|{details}"
+    typer.echo(f"Signing log entry: {data_to_sign}")
+
+    # 3. Load Private Key
+    try:
+        private_key = load_private_key_from_vault()
+    except Exception as e:
+        typer.echo(f"Failed to load private key: {e}")
+        raise typer.Exit(code=1)
+
+    # 4. Sign
+    try:
+        signature = private_key.sign(
+            data_to_sign.encode("utf-8"),
+            padding.PKCS1v15(),
+            hashes.SHA256()
+        )
+        signature_b64 = base64.b64encode(signature).decode("utf-8")
+    except Exception as e:
+        typer.echo(f"Failed to sign log entry: {e}")
+        raise typer.Exit(code=1)
+
+    # 5. Send to backend
+    result = api_validate_audit_log(token, log_id, signature_b64, rbac_token)
     if result:
         typer.echo(f"Validation entry created successfully for Log ID {log_id}! 🗸")
     else:

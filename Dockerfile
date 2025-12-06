@@ -14,8 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create a wrapper script for the CLI
-RUN echo '#!/bin/bash\npython3 -m cli.main "$@"' > /usr/local/bin/secureshare && \
-    chmod +x /usr/local/bin/secureshare
+RUN echo '#!/bin/bash\npython3 -m cli.main "$@"' > /usr/local/bin/ss && \
+    chmod +x /usr/local/bin/ss
 
 # Expose port 8000 for the FastAPI app
 EXPOSE 8000
