@@ -62,9 +62,27 @@ The project is organized as follows:
     source venv/bin/activate
     pip install -r requirements.txt
     
-    # Verify installation
+    # Verify installatio    # Run CLI
     python3 -m cli.main --help
     ```
+
+### Certificates (TLS)
+The application uses TLS for secure communication. You must generate the certificates before running the system.
+```bash
+./generate_certs.sh
+```
+This script creates a Certificate Authority (CA) and issues a certificate for `localhost` and `secureshare` (internal Docker DNS). The certificates are stored in the `certs/` directory and mounted into the containers.
+
+### Running Multiple CLIs (Docker)
+For testing multi-user scenarios, the Docker Compose setup includes three pre-configured CLI containers (`cli-1`, `cli-2`, `cli-3`). These containers have the CA certificate installed and are ready to connect to the backend.
+
+To access a CLI container:
+```bash
+docker compose exec cli-1 bash
+# Inside the container:
+python3 -m cli.main --help
+```
+You can open multiple terminal tabs and access `cli-2` and `cli-3` simultaneously to simulate different users interacting with the system.
 
 ## Configuration
 
@@ -132,7 +150,7 @@ The application is configured via the `.env` file.
 - `POST /transfers`: Uploads an encrypted file and metadata.
 - `GET /transfers/{transferId}`: Retrieves transfer metadata and encrypted keys.
 - `DELETE /transfers/{transferId}`: Deletes a transfer.
-- `GET /download/{transferId}`: Downloads the raw encrypted file blob.
+- `GET /transfers/download/{transfer_id}`: Downloads the raw encrypted file blob.
 
 ### Audit
 - `GET /audit/log`: Retrieves the audit log (Auditor only).
