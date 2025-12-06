@@ -155,3 +155,93 @@ The application is configured via the `.env` file.
 ### Audit
 - `GET /audit/log`: Retrieves the audit log (Auditor only).
 - `PUT /audit/validate`: Adds a validation to the log (Auditor only).
+
+## CLI Command Reference
+
+### Authentication
+
+```bash
+# Login with username and password. Creates an active session.
+python3 -m cli.main auth login
+
+# Ends the active session.
+python3 -m cli.main auth logout
+
+# Activates a new account with OTP and sets password. Generates key pair.
+python3 -m cli.main auth activate
+```
+
+### Current User
+
+```bash
+# Change password
+python3 -m cli.main user update-password
+
+# Update email and/or name
+python3 -m cli.main user update-info --email new@email.com --name "New Name"
+
+# Shows current user information (ID, username, email, etc.)
+python3 -m cli.main user me
+```
+
+### User Management (Admin/SO)
+
+```bash
+# Delete user with confirmation
+python3 -m cli.main users delete user3
+
+# Delete without confirmation
+python3 -m cli.main users delete user3 --force
+
+# Lists all users (requires Admin or Security Officer)
+python3 -m cli.main users list
+
+# Creates a new user (requires Admin)
+python3 -m cli.main users create
+
+# Lists and selects an active RBAC Token (role)
+python3 -m cli.main users role
+
+# Lists and selects an active MLS clearance
+python3 -m cli.main users clearance
+
+# Assigns a role to a user (requires Admin or SO)
+# Roles: ADMINISTRATOR, SECURITY_OFFICER, TRUSTED_OFFICER, AUDITOR, STANDARD_USER
+python3 -m cli.main users assign-role <USERNAME> --role <ROLE>
+
+# Assigns MLS clearance to a user (requires SO)
+# Levels: TOP_SECRET, SECRET, CONFIDENTIAL, UNCLASSIFIED
+python3 -m cli.main users assign-clearance <USERNAME> --level <LEVEL> --dept <DEPT>
+```
+
+### Transfers
+
+```bash
+# E2EE upload of a file for specific recipient(s)
+python3 -m cli.main transfers upload <FILEPATH> --to <USER_ID> --level <LEVEL> --dept <DEPT>
+
+# Public upload with link + key in fragment
+python3 -m cli.main transfers upload <FILEPATH> --public
+
+# E2EE download of a file. Requires appropriate clearance.
+python3 -m cli.main transfers download <TRANSFER_ID> [--output <PATH>]
+
+# Lists transfers where you are sender or recipient
+python3 -m cli.main transfers list
+
+# Deletes a transfer (owner only)
+python3 -m cli.main transfers delete <TRANSFER_ID> [--force]
+```
+
+### Departments (Admin)
+
+```bash
+# Lists all departments
+python3 -m cli.main departments list
+
+# Creates a new department (requires Admin)
+python3 -m cli.main departments create <NAME>
+
+# Deletes a department (requires Admin)
+python3 -m cli.main departments delete <ID> [--force]
+```
