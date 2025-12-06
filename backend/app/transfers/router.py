@@ -9,6 +9,7 @@ from sqlmodel import Session
 from ..models.Transfer import SecurityLevel
 from ..models.User import User
 from ..core.database import get_session
+from ..audit.service import log_event
 from ..auth.service import get_current_user, get_current_clearance, check_if_trusted_officer_or_none
 from . import service
 
@@ -43,9 +44,9 @@ async def create_transfer(
     )
     action = f"POST /transfers {status.HTTP_201_CREATED} - {http.HTTPStatus(status.HTTP_201_CREATED).phrase}"
     if is_trusted_officer:
-        log_event(session, current_user.id, action, "Trusted officer: {x_justification}")
+        log_event(db, current_user.id, action, f"Trusted officer: {x_justification}")
     else:
-        log_event(session, current_user.id, action, "Transfer created successfully")
+        log_event(db, current_user.id, action, "Transfer created successfully")
     return {"transfer_id": transfer_id}
 
 @router.get("/{transfer_id}")
@@ -59,9 +60,9 @@ async def get_transfer_metadata(
 ):
     action = f"GET /transfers/{transfer_id} {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
     if is_trusted_officer:
-        log_event(session, current_user.id, action, "Trusted officer: {x_justification}")
+        log_event(db, current_user.id, action, f"Trusted officer: {x_justification}")
     else:
-        log_event(session, current_user.id, action, "Transfer metadata retrieved successfully")
+        log_event(db, current_user.id, action, "Transfer metadata retrieved successfully")
 
     return service.get_transfer_metadata_service(
         db, 
@@ -83,9 +84,9 @@ async def download_encrypted_blob(
 ):
     action = f"GET /transfers/download/{transfer_id} {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
     if is_trusted_officer:
-        log_event(session, current_user.id, action, "Trusted officer: {x_justification}")
+        log_event(db, current_user.id, action, f"Trusted officer: {x_justification}")
     else:
-        log_event(session, current_user.id, action, "Transfer downloaded successfully")
+        log_event(db, current_user.id, action, "Transfer downloaded successfully")
     iterfile = service.get_transfer_file_stream_service(
         db, 
         current_user, 
@@ -102,7 +103,7 @@ async def list_user_transfers(
     db: Session = Depends(get_session)
 ):
     action = f"GET /transfers {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
-    log_event(session, current_user.id, action, "Transfers listed successfully")
+    log_event(db, current_user.id, action, "Transfers listed successfully")
     return service.list_user_transfers_service(db, current_user)
 
 @router.delete("/{transfer_id}")
@@ -113,5 +114,5 @@ async def delete_transfer(
 ):
     service.delete_transfer_service(db, current_user, transfer_id)
     action = f"DELETE /transfers/{transfer_id} {status.HTTP_204_NO_CONTENT} {http.HTTPStatus(status.HTTP_204_NO_CONTENT).phrase}"
-    log_event(session, current_user.id, action, "Transfer deleted successfully")
+    log_event(db, current_user.id, action, "Transfer deleted successfully")
     return {"detail": "Transfer deleted"}

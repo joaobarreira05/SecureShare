@@ -6,7 +6,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./secureshare.db:/app/secureshare.db
+      - ./data:/app/data
     #  - ./certs:/app/certs # Optional: Mount certs if you want to change them without rebuilding
 
   sonarqube:

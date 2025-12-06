@@ -3,6 +3,7 @@ import http
 from sqlmodel import Session
 from ..core.database import get_session
 from ..auth.service import get_current_active_admin
+from ..audit.service import log_event
 from ..models.User import User
 from ..models.Department import DepartmentCreate, DepartmentResponse
 from .service import create_department, get_all_departments, delete_department
@@ -30,7 +31,7 @@ async def read_departments(
     """
     List all departments (Admin only).
     """
-    action = f"POST /departments {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
+    action = f"GET /departments {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
     log_event(session, current_admin.id, action, "Departments listed successfully")
     return get_all_departments(session)
 
@@ -43,6 +44,6 @@ async def remove_department(
     """
     Delete a department (Admin only).
     """
-    action = f"POST /departments/{dept_id} {status.HTTP_204_NO_CONTENT} {http.HTTPStatus(status.HTTP_204_NO_CONTENT).phrase}"
+    action = f"DELETE /departments/{dept_id} {status.HTTP_204_NO_CONTENT} {http.HTTPStatus(status.HTTP_204_NO_CONTENT).phrase}"
     log_event(session, current_admin.id, action, "Department deleted successfully")
     delete_department(session, dept_id)

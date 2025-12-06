@@ -32,7 +32,7 @@ async def login(login_data: LoginRequest, session: Session = Depends(get_session
 
     if not user:
         action = f"POST /login {status.HTTP_401_UNAUTHORIZED} - {http.HTTPStatus(status.HTTP_401_UNAUTHORIZED).phrase}"
-        log_event(session, user.id, action, "Incorrect username or password")
+        log_event(session, 0, action, "Incorrect username or password")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",

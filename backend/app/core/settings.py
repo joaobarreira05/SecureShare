@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "SecureShare"
-    DATABASE_URL: str = "sqlite:///./secureshare.db"
+    DATABASE_URL: str = "sqlite:////app/data/secureshare.db"
     
     # Auth Config
     ALGORITHM: str 

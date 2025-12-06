@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 import http
 from sqlmodel import Session, SQLModel
 from ..core.database import get_session
+from ..audit.service import log_event
 from ..models.User import VaultContent, VaultUpdate, UserCreate, UserResponse
 from ..models.JWTRevocationToken import JWTRevocationToken
 from .service import create_user, get_all_users
@@ -51,7 +52,10 @@ async def read_users(
     return await get_all_users(session)
 
 @router.get("/me/vault", response_model=VaultContent)
-async def get_user_vault(current_user: User = Depends(get_current_user)):
+async def get_user_vault(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
     """
     Retrieve the current user's encrypted private key blob.
     """
