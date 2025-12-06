@@ -70,8 +70,8 @@ def update_password():
         typer.echo("Passwords do not match.")
         raise typer.Exit(code=1)
 
-    if len(new_password) < 8:
-        typer.echo("Password must be at least 8 characters.")
+    from cli.core.utils import validate_password
+    if not validate_password(new_password):
         raise typer.Exit(code=1)
 
     # 4) Re-encrypt vault with new password

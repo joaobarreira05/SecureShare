@@ -101,8 +101,8 @@ def activate():
         typer.echo("Passwords do not match.")
         raise typer.Exit(code=1)
 
-    if len(password) < 8:
-        typer.echo("Password too short (minimum 8 characters).")
+    from cli.core.utils import validate_password
+    if not validate_password(password):
         raise typer.Exit(code=1)
 
     # Gerar chaves RSA
