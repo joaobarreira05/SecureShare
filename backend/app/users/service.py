@@ -236,7 +236,23 @@ async def verify_and_store_mls_token(session: Session, signed_jwt: str):
     if revoked:
         raise HTTPException(status_code=403, detail="Token has been revoked")
 
-    # 6. Store Token
+    # 6. Validate Departments
+    departments = payload.get("departments", [])
+    if departments:
+        from ..models.Department import Department
+        # Check if all departments exist
+        statement = select(Department.name).where(Department.name.in_(departments))
+        existing_depts = session.exec(statement).all()
+        
+        existing_depts_set = set(existing_depts)
+        for dept in departments:
+            if dept not in existing_depts_set:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid department in token: {dept}"
+                )
+
+    # 7. Store Token
     # We store the raw signed_jwt as requested
     mls_token = JWTMLSToken(
         token_id=jti,
