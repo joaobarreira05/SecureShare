@@ -51,7 +51,7 @@ The project is organized as follows:
 3.  **Start the Application (Docker)**
     Build and start the backend and SonarQube services.
     ```bash
-    docker compose up --build
+    docker compose up --build -d
     ```
     *The backend will be available at `https://localhost:8000` (via Nginx/TLS if configured) or `http://localhost:8000` depending on your Docker setup.*
 
@@ -164,6 +164,12 @@ python3 -m cli.main users assign-role <USERNAME> --role <ROLE>
 # Assigns MLS clearance to a user (requires SO)
 # Levels: TOP_SECRET, SECRET, CONFIDENTIAL, UNCLASSIFIED
 python3 -m cli.main users assign-clearance <USERNAME> --level <LEVEL> --dept <DEPT>
+
+# Revokes a role from a user (requires SO)
+python3 -m cli.main users revoke-role <USERNAME> [--token <INDEX>]
+
+# Revokes an MLS clearance from a user (requires SO)
+python3 -m cli.main users revoke-clearance <USERNAME> [--token <INDEX>]
 ```
 
 ### Transfers
@@ -196,4 +202,14 @@ python3 -m cli.main departments create <NAME>
 
 # Deletes a department (requires Admin)
 python3 -m cli.main departments delete <ID> [--force]
+```
+
+### Audit (Auditor)
+
+```bash
+# Retrieve the audit log
+python3 -m cli.main audit log
+
+# Validate a log entry (sign it)
+python3 -m cli.main audit validate <LOG_ID>
 ```
