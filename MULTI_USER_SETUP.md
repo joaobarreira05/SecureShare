@@ -64,13 +64,13 @@ Inside any CLI container, you can run commands as usual:
 
 ```bash
 # Login
-python3 -m cli.main auth login
+secureshare auth login
 
 # List users
-python3 -m cli.main users list
+secureshare users list
 
 # Create a user
-python3 -m cli.main users create
+secureshare users create
 ```
 
 You can use different containers to simulate different users simultaneously (e.g., Admin in `cli-1`, User A in `cli-2`).

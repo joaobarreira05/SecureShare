@@ -39,8 +39,8 @@ We provide 3 pre-configured CLI containers (`cli-1`, `cli-2`, `cli-3`) that are 
 3.  **Run CLI commands**:
     Inside the container, run commands using the python module syntax:
     ```bash
-    python3 -m cli.main auth login
-    python3 -m cli.main users list
+    secureshare auth login
+    secureshare users list
     ```
 
 ## Run with Persistent Database
