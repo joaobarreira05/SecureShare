@@ -47,10 +47,10 @@ def check_mls_write(
         # Example: Top Secret User cannot write to Secret File.
         clearance_ok = user_clearance_level <= file_classification_level
         
-        # Check departments (User.departments ⊇ File.departments)
-        # User must have ALL departments associated with the file.
+        # Check departments (*-Property: User.departments ⊆ File.departments)
+        # User can only write to files that have ALL of their departments.
         file_departments = set(departments)
-        departments_ok = file_departments.issubset(user_departments)
+        departments_ok = user_departments.issubset(file_departments)
         
         if clearance_ok and departments_ok:
             return True

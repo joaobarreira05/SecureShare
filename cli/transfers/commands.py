@@ -2,6 +2,8 @@ from pathlib import Path
 from typing import List, Optional
 import tempfile
 import os
+import zipfile
+import io
 
 import typer
 import base64
@@ -41,7 +43,7 @@ app = typer.Typer(help="File transfer commands (upload/download).")
 
 @app.command("upload")
 def upload(
-    filepath: str = typer.Argument(..., help="Path to the file to upload"),
+    filepaths: List[str] = typer.Argument(..., help="Path(s) to the file(s) to upload"),
     recipients: Optional[List[int]] = typer.Option(
         None, "--to", "-t", help="Recipient IDs (required if not public)"
     ),
@@ -52,7 +54,7 @@ def upload(
     justification: Optional[str] = typer.Option(None, "--justification", "-j", help="Justification for MLS bypass (Trusted Officer)"),
 ):
     """
-    E2EE file upload.
+    E2EE file upload. Supports multiple files in a single transfer.
     Use --to ID to specify recipients or --public for public share.
     Trusted Officers can use --justification for MLS bypass.
     """
@@ -66,13 +68,17 @@ def upload(
         typer.echo("You must specify at least one recipient (--to ID) or use --public.")
         raise typer.Exit(code=1)
 
-    path = Path(filepath)
-    # If file not found, try in current working directory
-    if not path.is_file():
-        path = Path.cwd() / filepath
-    if not path.is_file():
-        typer.echo(f"File not found: {filepath}")
-        raise typer.Exit(code=1)
+    # Validate all file paths
+    valid_paths: List[Path] = []
+    for filepath in filepaths:
+        path = Path(filepath)
+        # If file not found, try in current working directory
+        if not path.is_file():
+            path = Path.cwd() / filepath
+        if not path.is_file():
+            typer.echo(f"File not found: {filepath}")
+            raise typer.Exit(code=1)
+        valid_paths.append(path)
 
     # For public transfers: no level/departments (always UNCLASSIFIED and empty)
     if public:
@@ -101,11 +107,11 @@ def upload(
                 typer.echo(f"MLS Error: You cannot upload with level {level} (your level is {user_level}).")
                 raise typer.Exit(code=1)
 
-            # Departments Subset
+            # *-Property: User Departments ⊆ File Departments (No Write Down)
             file_depts = set(departments or [])
-            if not file_depts.issubset(user_depts):
-                missing = file_depts - user_depts
-                typer.echo(f"MLS Error: You don't have access to departments: {', '.join(missing)}")
+            if not user_depts.issubset(file_depts):
+                missing = user_depts - file_depts
+                typer.echo(f"MLS Error: You must include all your departments. Missing: {', '.join(missing)}")
                 raise typer.Exit(code=1)
 
         except typer.Exit:
@@ -113,9 +119,21 @@ def upload(
         except Exception as e:
             typer.echo(f"Warning: Could not validate MLS rules ({e}). Backend will perform final validation.")
 
-    # 1) Read file
-    file_data = path.read_bytes()
-    filename = path.name
+    # 1) Prepare file data - single file or ZIP for multiple
+    if len(valid_paths) == 1:
+        # Single file: use directly
+        file_data = valid_paths[0].read_bytes()
+        filename = valid_paths[0].name
+    else:
+        # Multiple files: create ZIP archive
+        typer.echo(f"Packaging {len(valid_paths)} files into a ZIP archive...")
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for path in valid_paths:
+                zf.write(path, path.name)
+        file_data = zip_buffer.getvalue()
+        # Use first filename as base for ZIP name
+        filename = f"transfer_{valid_paths[0].stem}_and_{len(valid_paths)-1}_more.zip"
 
     # 2) Generate AES File Key
     file_key = generate_file_key()
