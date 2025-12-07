@@ -2,6 +2,8 @@ import typer
 import base64
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
+import hashlib
+from datetime import datetime
 
 from cli.core.session import load_token, load_rbac_token
 from cli.core.api import api_get_audit_logs, api_validate_audit_log
@@ -9,6 +11,25 @@ from cli.core.rbac import decode_rbac_token
 from cli.core.crypto import load_private_key_from_vault
 
 app = typer.Typer(help="Audit management commands (Auditor only).")
+
+
+def calculate_hash(log_entry: dict, previous_hash: str) -> str:
+    """
+    Replicates the backend's hash calculation logic.
+    """
+    # Timestamp format from backend is ISO 8601 (e.g., "2023-10-27T10:00:00")
+    # We use it directly as a string since that's how it was hashed
+    ts_str = log_entry.get("timestamp", "")
+    
+    # Backend logic: previous_hash + timestamp + actor_id + action + details
+    data = (
+        previous_hash +
+        ts_str +
+        str(log_entry.get("actor_id", "")) +
+        log_entry.get("action", "") +
+        (log_entry.get("details", "") or "")
+    )
+    return hashlib.sha256(data.encode("utf-8")).hexdigest()
 
 @app.command("log")
 def get_log():
@@ -94,7 +115,36 @@ def validate_log(
         typer.echo(f"Log ID {log_id} not found.")
         raise typer.Exit(code=1)
 
-    # 2. Construct data to sign
+    # 2. Verify Hash Chain up to target_log
+    typer.echo("Verifying hash chain integrity...")
+    
+    # Sort logs by ID to ensure correct order
+    sorted_logs = sorted(logs, key=lambda x: x.get("id"))
+    
+    previous_hash = "00000000000000000000000000000000"
+    
+    for log in sorted_logs:
+        # Calculate expected hash
+        expected_hash = calculate_hash(log, previous_hash)
+        stored_hash = log.get("current_hash", "")
+        
+        if expected_hash != stored_hash:
+            typer.echo(f" Hash mismatch at Log ID {log.get('id')}!")
+            typer.echo(f"  Expected: {expected_hash}")
+            typer.echo(f"  Stored:   {stored_hash}")
+            typer.echo("Chain is broken. Cannot validate.")
+            raise typer.Exit(code=1)
+            
+        # Update previous_hash for next iteration
+        previous_hash = stored_hash
+        
+        # Stop if we reached the target log (we verified it and everything before it)
+        if str(log.get("id")) == str(log_id):
+            break
+            
+    typer.echo("Hash chain verified successfully. Adding a validation entry...")
+
+    # 3. Construct data to sign
     # Format: ID|TIMESTAMP|ACTOR|ACTION|DETAILS
     # We must handle None values safely
     lid = str(target_log.get("id", ""))
