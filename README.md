@@ -56,17 +56,17 @@ The project is organized as follows:
     *The backend will be available at `https://localhost:8000` (via Nginx/TLS if configured) or `http://localhost:8000` depending on your Docker setup.*
 
 4.  **Access the CLI (Docker)**
-    The environment includes 3 pre-configured CLI containers. Open separate terminals to simulate different users:
+    The environment includes 3 pre-configured CLI containers. Open separate terminals to simulate different users(Please do docker ps and check the names of the containers to match the ones in the commands below):
+
     ```bash
     # Terminal 1
-    docker exec project-2-secureshare-119792_119876_120054-cli-1-1 /bin/bash
+    docker exec -it project-2-secureshare-119792_119876_120054-cli-1-1 /bin/bash
 
     # Terminal 2
-    docker exec project-2-secureshare-119792_119876_120054-cli-2-1 /bin/bash
+    docker exec -it project-2-secureshare-119792_119876_120054-cli-2-1 /bin/bash
 
     # Terminal 3
-    docker exec project-2-secureshare-119792_119876_120054-cli-3-1 /bin/bash
-    ```
+    docker exec -it project-2-secureshare-119792_119876_120054-cli-3-1 /bin/bash
     ```
     *Inside the container, you can use the alias `ss` instead of `python3 -m cli.main`. For example: `ss --help`.*
 
