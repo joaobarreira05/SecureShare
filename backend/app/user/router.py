@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 import http
 from sqlmodel import Session
 from ..core.database import get_session
@@ -30,6 +30,11 @@ async def update_my_info(
     """
     Updates existing information, such as the password.
     """
+    if current_user.is_admin and update_data.password:
+        action = f"POST /user/me/info {status.HTTP_403_FORBIDDEN} - Admin cannot change password"
+        log_event(session, current_user.id, action)
+        raise HTTPException(status_code=403, detail="Administrators cannot change their password")
+
     action = f"POST /user/me/info {status.HTTP_200_OK} {http.HTTPStatus(status.HTTP_200_OK).phrase}"
     log_event(session, current_user.id, action, "User info updated successfully")
     return await update_user_info(session, current_user, update_data)
