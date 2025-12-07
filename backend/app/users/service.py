@@ -124,7 +124,8 @@ async def verify_and_store_role_token(session: Session, signed_jwt: str):
     target_user = session.get(User, int(sub))
     if target_user and target_user.is_admin:
         raise HTTPException(status_code=403, detail="Administrators cannot be assigned roles")
-
+    if target_user.id == issuer_user.id:
+        raise HTTPException(status_code=403, detail="You cannot assign a role to yourself")
     # 6. Policy Check
     issuer_role = None
     if issuer_user.is_admin:
@@ -275,11 +276,11 @@ async def verify_and_store_mls_token(session: Session, signed_jwt: str):
     exp = payload.get("exp")
     sub = payload.get("sub")
     jti = payload.get("jti")
-
+    
     if not exp or not sub or not jti:
         raise HTTPException(status_code=400, detail="Missing required claims (exp, sub, jti)")
 
-    if issuer_id == int(sub):
+    if int(issuer_id) == int(sub):
         raise HTTPException(status_code=400, detail="A security officer cannot issue a token for himself")
 
     # 5. Check Revocation
@@ -291,7 +292,7 @@ async def verify_and_store_mls_token(session: Session, signed_jwt: str):
     target_user = session.get(User, int(sub))
     if target_user and target_user.is_admin:
         raise HTTPException(status_code=403, detail="Administrators cannot be assigned clearances")
-
+    
     # 6. Validate Departments
     departments = payload.get("departments", [])
     if departments:

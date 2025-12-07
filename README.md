@@ -96,7 +96,7 @@ This script creates a Certificate Authority (CA) and issues a certificate for `l
 
 The application is configured via the `.env` file.
 Feel free to modify the variables in said file to change the configuration of the application.
-
+Make sure to look at the .env.example file to see the default admin credentials.
 | Variable | Description |
 | :--- | :--- |
 | `PROJECT_NAME` | Name of the application. |
