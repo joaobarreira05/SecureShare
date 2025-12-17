@@ -47,7 +47,7 @@ def create_department(
 
     result = api_create_department(token, name)
     if result:
-        typer.echo(f"Department '{name}' created successfully!")
+        typer.echo(f"Department '{name}' created successfully! 🗸")
     else:
         typer.echo("Failed to create department. Check Admin permissions.")
         raise typer.Exit(code=1)

@@ -32,8 +32,8 @@ def me():
     typer.echo(f"   Username: {info.get('username', '-')}")
     typer.echo(f"   Email:    {info.get('email', '-')}")
     typer.echo(f"   Name:     {info.get('full_name', '-')}")
-    typer.echo(f"   Active:   {'Yes' if info.get('is_active') else 'No'}")
-    typer.echo(f"   Admin:    {'Yes' if info.get('is_admin') else 'No'}")
+    typer.echo(f"   Active:   {'🗸' if info.get('is_active') else '☓'}")
+    typer.echo(f"   Admin:    {'🗸' if info.get('is_admin') else '☓'}")
 
 
 @app.command("update-password")
