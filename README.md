@@ -2,7 +2,7 @@
 
 SecureShare is a single-tenant secure file transfer web application designed to ensure end-to-end encryption and strict access control. It implements a robust security model including Role-Based Access Control (RBAC) and Multi-Level Security (MLS) with Bell-LaPadula enforcement.
 
-#Grade 20
+# Grade 20
 
 ## Project Structure
 
